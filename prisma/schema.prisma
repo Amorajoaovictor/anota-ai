@@ -1,0 +1,233 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Priority {
+  P0
+  P1
+  P2
+  P3
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TaskStatus {
+  BACKLOG
+  IN_PROGRESS
+  BLOCKED
+  IN_REVIEW
+  COMPLETED
+  CANCELED
+}
+
+enum TaskKind {
+  TASK
+  BUG
+  IMPROVEMENT
+  FEATURE
+  DECISION
+  EXTERNAL_REQUEST
+  FUTURE_IDEA
+  QUESTION
+}
+
+enum MilestoneStatus {
+  PLANNED
+  IN_PROGRESS
+  ACHIEVED
+  POSTPONED
+  CANCELED
+}
+
+enum InboxStatus {
+  RECEIVED
+  TRANSCRIBING
+  ANALYZING
+  AWAITING_CONFIRMATION
+  PROCESSED
+  DISCARDED
+  ERROR
+}
+
+enum InboxSource {
+  TEXT
+  AUDIO
+  TRELLO
+  MCP
+  SPREADSHEET
+}
+
+model Project {
+  id          String          @id @default(cuid())
+  ownerId     String
+  name        String
+  description String          @default("")
+  color       String          @default("#68d7a7")
+  priority    Priority        @default(P3)
+  status      ProjectStatus   @default(ACTIVE)
+  aliases     ProjectAlias[]
+  modules     ProjectModule[]
+  contexts    ProjectContext[]
+  tasks       Task[]
+  milestones  Milestone[]
+  attachments Attachment[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([ownerId, name])
+}
+
+model ProjectAlias {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  value     String
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, value])
+}
+
+model ProjectModule {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  terms     String[] @default([])
+  tasks     Task[]
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, name])
+}
+
+model Task {
+  id           String           @id @default(cuid())
+  projectId    String
+  project      Project          @relation(fields: [projectId], references: [id], onDelete: Restrict)
+  moduleId     String?
+  module       ProjectModule?   @relation(fields: [moduleId], references: [id], onDelete: SetNull)
+  title        String
+  description  String           @default("")
+  kind         TaskKind         @default(TASK)
+  status       TaskStatus       @default(BACKLOG)
+  priority     Priority         @default(P3)
+  complexity   Int?
+  dueAt        DateTime?
+  forecastAt   DateTime?
+  sourceInboxId String?         @unique
+  source        InboxItem?      @relation("InboxTask", fields: [sourceInboxId], references: [id], onDelete: SetNull)
+  sourceNoteId String?          @unique
+  sourceNote   Note?            @relation("NoteTask", fields: [sourceNoteId], references: [id], onDelete: SetNull)
+  milestones   TaskMilestone[]
+  contexts     ProjectContext[]
+  dependsOn    TaskDependency[] @relation("DependentTask")
+  blocks       TaskDependency[] @relation("BlockingTask")
+  attachments  Attachment[]
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+model TaskDependency {
+  taskId      String
+  dependsOnId String
+  task        Task     @relation("DependentTask", fields: [taskId], references: [id], onDelete: Cascade)
+  dependsOn   Task     @relation("BlockingTask", fields: [dependsOnId], references: [id], onDelete: Cascade)
+  createdAt   DateTime @default(now())
+
+  @@id([taskId, dependsOnId])
+}
+
+model Milestone {
+  id          String          @id @default(cuid())
+  projectId   String
+  project     Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name        String
+  description String          @default("")
+  startAt     DateTime?
+  targetAt    DateTime
+  status      MilestoneStatus @default(PLANNED)
+  tasks       TaskMilestone[]
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model TaskMilestone {
+  taskId      String
+  milestoneId String
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  milestone   Milestone @relation(fields: [milestoneId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, milestoneId])
+}
+
+model Note {
+  id            String   @id @default(cuid())
+  ownerId       String
+  title         String
+  content       String
+  pinned        Boolean  @default(false)
+  convertedTask Task?    @relation("NoteTask")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([ownerId])
+}
+
+model ProjectContext {
+  id        String   @id @default(cuid())
+  projectId String
+  project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId    String?
+  task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model InboxItem {
+  id          String      @id @default(cuid())
+  ownerId     String
+  source      InboxSource @default(TEXT)
+  status      InboxStatus @default(RECEIVED)
+  text        String
+  suggestion  Json?
+  createdTask Task?       @relation("InboxTask")
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  @@index([ownerId, createdAt])
+}
+
+model Attachment {
+  id          String   @id @default(cuid())
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId      String?
+  task        Task?    @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  storageKey  String   @unique
+  filename    String
+  contentType String
+  sizeBytes   Int
+  createdAt   DateTime @default(now())
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  actorId    String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  @@index([entityType, entityId])
+  @@index([actorId, createdAt])
+}
