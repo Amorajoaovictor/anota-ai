@@ -1,4 +1,5 @@
 import { createNeonAuth } from '@neondatabase/auth/next/server'
+import { UnauthorizedError } from '../../server/http'
 import { getNeonAuthConfig, readNeonAuthEnvironment } from './config'
 
 let neonAuth: ReturnType<typeof createNeonAuth> | undefined
@@ -16,6 +17,6 @@ export function getNeonAuth() {
 
 export async function requireCurrentUserId() {
   const { data } = await getNeonAuth().getSession()
-  if (!data?.user) throw new Error('Não autenticado.')
+  if (!data?.user) throw new UnauthorizedError()
   return data.user.id
 }

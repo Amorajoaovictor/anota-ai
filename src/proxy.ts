@@ -19,5 +19,9 @@ export default function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!api/auth|api/health|_next|favicon.ico).*)'],
+  /**
+   * O redirecionamento para login vale só para páginas. As rotas `/api` respondem JSON:
+   * as de dados exigem sessão em `withOwner` (401) e a fila valida o próprio token.
+   */
+  matcher: ['/((?!api|_next|favicon.ico).*)'],
 }
