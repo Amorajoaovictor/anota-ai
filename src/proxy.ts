@@ -22,6 +22,8 @@ export const config = {
   /**
    * O redirecionamento para login vale só para páginas. As rotas `/api` respondem JSON:
    * as de dados exigem sessão em `withOwner` (401) e a fila valida o próprio token.
+   * O manifest e o ícone ficam de fora porque o navegador os busca sem credencial:
+   * atrás do guard, a instalação como PWA receberia o HTML do login.
    */
-  matcher: ['/((?!api|_next|favicon.ico).*)'],
+  matcher: ['/((?!api|_next|favicon.ico|icon.svg|manifest.webmanifest).*)'],
 }

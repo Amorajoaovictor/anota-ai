@@ -60,4 +60,17 @@ describe('auth route', () => {
     expect(handler.POST).toHaveBeenCalledTimes(2)
     await expect(handler.POST.mock.calls[1][0].json()).resolves.toEqual({ email: 'teste@exemplo.com', password: 'senha-segura' })
   })
+
+  it('entrega cookie local na raiz para sessao sobreviver ao login local', async () => {
+    const upstream = new Response(null, { status: 204 })
+    upstream.headers.append('set-cookie', '__Secure-neon-auth.session_token=token; Path=/neondb/auth; Domain=auth.neon.tech; HttpOnly; Secure; SameSite=Strict')
+    handler.GET.mockResolvedValue(upstream)
+
+    const response = await GET(new Request('http://localhost/api/auth/get-session'), contextFor(['get-session']))
+
+    expect(response.headers.get('set-cookie')).not.toContain('Domain=auth.neon.tech')
+    expect(response.headers.get('set-cookie')).toMatch(/;\s*Path=\/(?:;|$)/)
+    expect(response.headers.get('set-cookie')).toContain('Secure')
+    expect(response.headers.get('set-cookie')).toContain('__Secure-neon-auth.session_token=token')
+  })
 })

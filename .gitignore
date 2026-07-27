@@ -4,3 +4,8 @@ node_modules
 .env.local
 dist
 var
+certificates
+
+# Artefatos de build do Next e do TypeScript
+next-env.d.ts
+tsconfig.tsbuildinfo

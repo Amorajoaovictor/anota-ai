@@ -32,7 +32,11 @@ export function SignInForm() {
 
     setError(null)
     setIsSubmitting(true)
-    const result = await signInWithPassword({ email, password }, (credentials) => authClient.signIn.email(credentials))
+    const result = await signInWithPassword(
+      { email, password },
+      (credentials) => authClient.signIn.email(credentials),
+      () => authClient.getSession(),
+    )
     setIsSubmitting(false)
 
     if (result.error) {
