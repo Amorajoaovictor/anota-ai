@@ -1,4 +1,4 @@
-import type { Milestone, Task } from './domain'
+import { priorities, type Milestone, type Task } from './domain'
 
 const weekdays = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB']
 const months = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ']
@@ -48,7 +48,10 @@ export function groupTasksByRoadmapDay(tasks: Task[], days: RoadmapDay[]): {
   return {
     days: days.map((day) => ({
       ...day,
-      tasks: [...(scheduled.get(day.key) ?? [])].sort((left, right) => left.time.localeCompare(right.time)),
+      // Sem horário no card, o dia é ordenado pela prioridade e depois pelo título.
+      tasks: [...(scheduled.get(day.key) ?? [])].sort((left, right) =>
+        priorities.indexOf(left.priority) - priorities.indexOf(right.priority)
+        || left.title.localeCompare(right.title)),
     })),
     unscheduled: tasks.filter((task) => !task.due),
   }

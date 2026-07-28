@@ -82,7 +82,9 @@ model Project {
   status      ProjectStatus   @default(ACTIVE)
   aliases     ProjectAlias[]
   modules     ProjectModule[]
+  tags        ProjectTag[]
   contexts    ProjectContext[]
+  notes       Note[]
   tasks       Task[]
   milestones  Milestone[]
   attachments Attachment[]
@@ -114,6 +116,29 @@ model ProjectModule {
   @@unique([projectId, name])
 }
 
+/// Etiqueta do card, sempre dentro de um projeto: o vocabulário de um projeto não
+/// vale no outro (PRD 24, "Contexto de projetos diferentes se misturar").
+model ProjectTag {
+  id        String    @id @default(cuid())
+  projectId String
+  project   Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  name      String
+  color     String    @default("#68d7a7")
+  tasks     TaskTag[]
+  createdAt DateTime  @default(now())
+
+  @@unique([projectId, name])
+}
+
+model TaskTag {
+  taskId String
+  tagId  String
+  task   Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  tag    ProjectTag @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([taskId, tagId])
+}
+
 model Task {
   id           String           @id @default(cuid())
   projectId    String
@@ -133,7 +158,9 @@ model Task {
   sourceNoteId String?          @unique
   sourceNote   Note?            @relation("NoteTask", fields: [sourceNoteId], references: [id], onDelete: SetNull)
   milestones   TaskMilestone[]
+  tags         TaskTag[]
   contexts     ProjectContext[]
+  notes        Note[]           @relation("NoteCard")
   dependsOn    TaskDependency[] @relation("DependentTask")
   blocks       TaskDependency[] @relation("BlockingTask")
   attachments  Attachment[]
@@ -174,17 +201,27 @@ model TaskMilestone {
   @@id([taskId, milestoneId])
 }
 
+/// Nota privada: fora de IA e MCP por decisão da Fase 0. Toda nota pertence a um
+/// projeto; `taskId` é o vínculo voluntário com um card e não se confunde com
+/// `convertedTask`, que é o card nascido desta nota.
 model Note {
   id            String   @id @default(cuid())
   ownerId       String
+  projectId     String
+  project       Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  taskId        String?
+  task          Task?    @relation("NoteCard", fields: [taskId], references: [id], onDelete: SetNull)
   title         String
   content       String
   pinned        Boolean  @default(false)
+  /// Ordem do arraste na tela. Float para caber um ponto médio entre vizinhos.
+  position      Float    @default(0)
   convertedTask Task?    @relation("NoteTask")
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
   @@index([ownerId])
+  @@index([projectId])
 }
 
 model ProjectContext {

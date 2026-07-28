@@ -7,11 +7,16 @@ import {
   addMilestone,
   getMilestoneProgress,
   removeMilestone,
+  scopeMilestones,
+  scopeProject,
+  scopeProjects,
+  scopeTasks,
   setTaskMilestones,
   updateMilestone,
   type AppState,
   type Milestone,
   type MilestoneStatus,
+  type Scope,
   type Task,
 } from './domain'
 import { ConfirmDialog, Modal } from './ui'
@@ -20,30 +25,36 @@ export const milestoneStatuses: MilestoneStatus[] = ['Planejado', 'Em andamento'
 
 export function MilestonesView({
   state,
+  scope,
   setState,
   notify,
   onOpenTask,
 }: {
   state: AppState
+  scope: Scope
   setState: (state: AppState) => void
   notify: (message: string) => void
   onOpenTask: (task: Task) => void
 }) {
-  const emptyDraft = { name: '', project: state.projects[0]?.name ?? '', targetDate: '', description: '' }
+  const scoped = scopeProject(state, scope)
+  const projects = scopeProjects(state, scope)
+  const inScope = useMemo(() => scopeMilestones(state, scope), [state, scope])
+  const scopedTasks = useMemo(() => scopeTasks(state, scope), [state, scope])
+  const emptyDraft = { name: '', project: scoped?.name ?? projects[0]?.name ?? '', targetDate: '', description: '' }
   const [draft, setDraft] = useState<typeof emptyDraft | null>(null)
   const [projectFilter, setProjectFilter] = useState('')
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
   const [removing, setRemoving] = useState<Milestone | null>(null)
-  const visible = useMemo(() => state.milestones
+  const visible = useMemo(() => inScope
     .filter((milestone) => !projectFilter || milestone.project === projectFilter)
-    .sort((left, right) => left.targetDate.localeCompare(right.targetDate)), [projectFilter, state.milestones])
-  const reached = state.milestones.filter((milestone) => milestone.status === 'Atingido').length
-  const selectedMilestone = state.milestones.find((milestone) => milestone.id === selectedMilestoneId)
-  const unlinked = state.tasks.filter((task) =>
+    .sort((left, right) => left.targetDate.localeCompare(right.targetDate)), [projectFilter, inScope])
+  const reached = inScope.filter((milestone) => milestone.status === 'Atingido').length
+  const selectedMilestone = inScope.find((milestone) => milestone.id === selectedMilestoneId)
+  const unlinked = scopedTasks.filter((task) =>
     !task.milestoneIds?.length
     && task.status !== 'Concluída'
     && (!projectFilter || task.project === projectFilter)
-    && state.milestones.some((milestone) => milestone.project === task.project))
+    && inScope.some((milestone) => milestone.project === task.project))
 
   function create(event: FormEvent) {
     event.preventDefault()
@@ -86,20 +97,20 @@ export function MilestonesView({
       <div>
         <p className="eyebrow">ENTREGAS-CHAVE</p>
         <h1><Flag size={34} />Marcos</h1>
-        <p className="heading-subtitle">Arraste tasks da bandeja para um marco para vincular, e de volta para desvincular.</p>
+        <p className="heading-subtitle">{scoped ? `Pontos-chave de ${scoped.name}. Arraste tasks da bandeja para vincular.` : 'Arraste tasks da bandeja para um marco para vincular, e de volta para desvincular.'}</p>
       </div>
       <button className="primary-button" onClick={() => setDraft(emptyDraft)}><Plus size={18} />Novo marco</button>
     </div>
 
     <section className="milestone-summary">
-      <div><Flag size={20} /><span><strong>{state.milestones.length}</strong> marcos</span></div>
+      <div><Flag size={20} /><span><strong>{inScope.length}</strong> marcos</span></div>
       <div><CheckCircle size={20} /><span><strong>{reached}</strong> atingidos</span></div>
-      <label>Projeto
+      {!scoped && <label>Projeto
         <select aria-label="Filtrar marcos por projeto" value={projectFilter} onChange={(event) => setProjectFilter(event.target.value)}>
           <option value="">Todos os projetos</option>
-          {state.projects.map((project) => <option key={project.id} value={project.name}>{project.name}</option>)}
+          {projects.map((project) => <option key={project.id} value={project.name}>{project.name}</option>)}
         </select>
-      </label>
+      </label>}
     </section>
 
     <MilestoneTray tasks={unlinked} onUnlink={unlink} />
@@ -108,7 +119,7 @@ export function MilestonesView({
       {visible.map((milestone) => <MilestoneCard
         key={milestone.id}
         milestone={milestone}
-        tasks={state.tasks}
+        tasks={scopedTasks}
         onOpenTask={onOpenTask}
         onView={() => setSelectedMilestoneId(milestone.id)}
         onStatusChange={(status) => changeStatus(milestone, status)}
@@ -131,7 +142,9 @@ export function MilestonesView({
     >
       <form id="milestone-create" className="ui-form" onSubmit={create}>
         <label className="ui-form-wide">Nome<input autoFocus value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} placeholder="Ex.: Homologação concluída" required /></label>
-        <label>Projeto<select value={draft.project} onChange={(event) => setDraft({ ...draft, project: event.target.value })}>{state.projects.map((project) => <option key={project.id}>{project.name}</option>)}</select></label>
+        <label>Projeto{scoped
+          ? <input value={scoped.name} readOnly aria-readonly="true" />
+          : <select value={draft.project} onChange={(event) => setDraft({ ...draft, project: event.target.value })}>{projects.map((project) => <option key={project.id}>{project.name}</option>)}</select>}</label>
         <label>Data-alvo<input type="date" value={draft.targetDate} onChange={(event) => setDraft({ ...draft, targetDate: event.target.value })} required /></label>
         <label className="ui-form-wide">Resultado esperado<textarea value={draft.description} onChange={(event) => setDraft({ ...draft, description: event.target.value })} placeholder="O que precisa estar verdadeiro quando este marco for atingido?" /></label>
       </form>
@@ -331,7 +344,8 @@ export function TaskMilestoneSelector({
   milestones,
   onChange,
 }: {
-  task: Task
+  /** Card existente ou rascunho de criação — só projeto e marcos importam aqui. */
+  task: Pick<Task, 'project' | 'milestoneIds'>
   milestones: Milestone[]
   onChange: (milestoneIds: string[]) => void
 }) {

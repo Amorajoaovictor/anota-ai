@@ -8,6 +8,21 @@
       "port": 3000,
       "autoPort": false,
       "url": "https://localhost:3000"
+    },
+    {
+      "name": "next-dev-http",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev", "--port", "3002"],
+      "port": 3002,
+      "autoPort": false,
+      "url": "http://localhost:3002"
+    },
+    {
+      "name": "next-dev-http-auto",
+      "runtimeExecutable": "npx",
+      "runtimeArgs": ["next", "dev"],
+      "port": 3003,
+      "autoPort": true
     }
   ]
 }

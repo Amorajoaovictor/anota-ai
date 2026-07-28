@@ -221,6 +221,8 @@ Todas as ações deverão passar pelos serviços e regras de negócio da aplica�
 
 Falhas do agente, do modelo ou dos serviços externos não poderão impedir o cadastro manual de projetos e tarefas.
 
+A criação manual de tarefa deverá estar acessível a partir de qualquer tela do produto, e não apenas da visualização tabular. Detalhamento na seção 12.10.
+
 ## 6.6 Aprendizado corrigível
 
 O agente deverá aprender com correções do usuário, mas toda associação aprendida deverá ser visualizável e editável.
@@ -776,7 +778,7 @@ Será a página inicial.
 - Entradas aguardando classificação.
 - Classificações de baixa confiança.
 - Alterações recentes no Trello.
-- Ações rápidas:
+- Ações rápidas (a ação `Nova tarefa` também existe como ação global, disponível fora desta tela — ver seção 12.10):
   - Nova tarefa.
   - Novo projeto.
   - Gravar áudio.
@@ -924,6 +926,7 @@ O Kanban utilizará os mesmos registros da visualização tabular.
 - Filtro por responsável.
 - Filtro por marco, incluindo a opção `Sem marco`.
 - Badge dos marcos vinculados em cada card.
+- Criação de card a partir do cabeçalho de uma coluna, herdando o status daquela coluna.
 - Criação de card com filtro de marco ativo vincula o novo card ao marco.
 - Limite visual de tarefas em andamento.
 - Destaque para prazo vencido.
@@ -1045,6 +1048,48 @@ O usuário deverá conseguir consultar e editar o que o agente conhece sobre cad
 - Definir expiração.
 - Promover memória temporária para permanente.
 - Visualizar quais classificações utilizaram a informação.
+
+## 12.10 Criação rápida de tarefa
+
+Criar um card não poderá depender da tela em que o usuário está nem do agente. A mesma janela de criação deverá ser aberta de qualquer ponto do produto.
+
+### Pontos de entrada
+
+- Ação global fixa na barra superior, disponível em todas as telas e em ambos os escopos.
+- Atalho de teclado dedicado, ignorado enquanto o foco estiver em um campo de texto.
+- Cabeçalho de cada coluna do Kanban.
+- Cabeçalho de cada dia do roadmap.
+- Cabeçalho das telas Planilha e Prazos.
+- Plano de ação da tela “Hoje”.
+
+### Campos
+
+- Obrigatórios: título e projeto.
+- Opcionais: status, módulo, tipo, prioridade, prazo e marcos.
+- No escopo de projeto o campo de projeto deverá vir travado com o projeto aberto.
+- Marcos deverão ser limitados ao projeto escolhido. Trocar o projeto deverá limpar a seleção anterior.
+
+### Pré-preenchimento por contexto
+
+- O escopo define o projeto.
+- A coluna do Kanban define o status.
+- O filtro de marco ativo no Kanban define o marco vinculado.
+- O dia do roadmap define o prazo.
+- O filtro de módulo da planilha define o módulo.
+
+### Autopreenchimento pela IA
+
+- A janela deverá oferecer uma ação opcional de sugestão para os campos não obrigatórios.
+- A sugestão deverá preencher apenas campos ainda no valor padrão e nunca sobrescrever o que o usuário digitou.
+- O projeto escolhido pelo usuário deverá prevalecer sobre a hipótese da IA.
+- A sugestão deverá exibir os valores propostos e a confiança, com ação de desfazer.
+- Falha ou ausência da sugestão não poderá bloquear a criação, conforme a seção 19.2.
+
+### Regras de nascimento
+
+- Sem informação em contrário o card nasce em `Backlog`, tipo `Tarefa` e prioridade `P3`, conforme a seção 22, Fase 0.
+- Card criado já em `Concluída` ou `Cancelada` não deverá entrar no plano de ação.
+- Marcos inválidos para o projeto deverão ser descartados sem impedir a criação.
 
 ---
 
@@ -1491,6 +1536,8 @@ Toda ação proposta pelo agente deverá registrar:
 - É possível criar, editar e arquivar projetos.
 - Projetos podem possuir aliases e módulos.
 - É possível criar e editar tarefas.
+- É possível criar uma tarefa a partir de qualquer tela, informando apenas título e projeto.
+- A criação a partir de uma coluna do Kanban ou de um dia do roadmap já nasce com o status ou o prazo daquele contexto.
 - A mesma tarefa aparece na tabela, Kanban e roadmap.
 - Alterações aparecem em todas as visualizações.
 
@@ -1579,6 +1626,7 @@ Toda ação proposta pelo agente deverá registrar:
 
 - Criar projetos, arquivamento, prioridades de projetos, aliases e tags.
 - Criar cards, tipos, prioridades, status, complexidade, prazos, previsões, dependências e histórico.
+- Disponibilizar a criação rápida de card em todas as telas, com pré-preenchimento por contexto, conforme a seção 12.10.
 - Criar notas privadas e contextos vinculados a projeto e, opcionalmente, card.
 - Implementar visualização Planilha e Kanban como duas visões dos mesmos cards.
 

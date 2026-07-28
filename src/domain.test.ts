@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  addContext,
   addMilestone,
   addProject,
   addTask,
@@ -16,9 +17,16 @@ import {
   groupTasksByStatus,
   initialState,
   moveTask,
+  removeContext,
   removeMilestone,
+  reorderNotes,
+  setProjectTags,
   setTaskMilestones,
+  setTaskTags,
+  suggestForecast,
   toggleNotePinned,
+  taskTags,
+  updateContext,
   updateMilestone,
   updateNote,
   updateInboxSuggestion,
@@ -29,6 +37,15 @@ import {
   addProjectModule,
   removeProjectModule,
   updateTask,
+  globalScope,
+  projectScope,
+  scopeContexts,
+  scopeMilestones,
+  scopeNotes,
+  scopeProject,
+  scopeProjects,
+  scopeTasks,
+  suggestTaskFields,
   type AppState,
 } from './domain'
 
@@ -148,10 +165,187 @@ describe('Central de Projetos — fluxos críticos', () => {
       status: 'Backlog',
       priority: 'P1',
       due: '30/07',
-      duration: 'A estimar',
     })
+    // Fase 0 do PRD: complexidade nasce vazia até a análise da IA.
+    expect(task.complexity).toBeUndefined()
     expect(created.actionPlan[0].id).toBe(task.id)
     expect(invalid).toBe(initialState)
+  })
+
+  it('cria tarefa com status, tipo e marco vindos do contexto da tela', () => {
+    const created = addTask(initialState, {
+      title: 'Revisar fluxo do mapa',
+      project: 'VistaFor',
+      status: 'Em andamento',
+      kind: 'Melhoria',
+      due: '31/07',
+      milestoneIds: ['milestone-vistafor-mvp'],
+    })
+    const task = created.tasks[0]
+
+    expect(task).toMatchObject({
+      status: 'Em andamento',
+      kind: 'Melhoria',
+      due: '31/07',
+      milestoneIds: ['milestone-vistafor-mvp'],
+    })
+    expect(created.actionPlan[0].id).toBe(task.id)
+  })
+
+  it('descarta marco de outro projeto sem impedir a criação e mantém card fechado fora do plano', () => {
+    const outroProjeto = addTask(initialState, {
+      title: 'Ajustar permissões',
+      project: 'Intranet',
+      milestoneIds: ['milestone-vistafor-mvp', 'milestone-inexistente', 'milestone-intranet-acessos'],
+    })
+    const concluida = addTask(initialState, { title: 'Registro retroativo', project: 'VistaFor', status: 'Concluída' })
+    const comIntranetArquivada = toggleProjectArchived(initialState, 'intranet')
+    const arquivado = addTask(comIntranetArquivada, { title: 'Card órfão', project: 'Intranet' })
+    const semTitulo = addTask(initialState, { title: '   ', project: 'VistaFor' })
+
+    expect(outroProjeto.tasks[0].milestoneIds).toEqual(['milestone-intranet-acessos'])
+    expect(concluida.tasks[0].status).toBe('Concluída')
+    expect(concluida.actionPlan.some((task) => task.id === concluida.tasks[0].id)).toBe(false)
+    expect(arquivado).toBe(comIntranetArquivada)
+    expect(semTitulo).toBe(initialState)
+  })
+
+  it('sugere campos opcionais sem sobrepor o projeto escolhido pelo usuário', () => {
+    const noProjetoCerto = suggestTaskFields(initialState, { title: 'Corrigir planta do loteamento', project: 'VistaFor' })
+    const noProjetoErrado = suggestTaskFields(initialState, { title: 'Corrigir planta do loteamento', project: 'Intranet' })
+    const semTitulo = suggestTaskFields(initialState, { title: '  ', project: 'VistaFor' })
+
+    expect(noProjetoCerto).toMatchObject({ module: 'Loteamentos / Mapa', kind: 'Melhoria', priority: 'P2' })
+    expect(noProjetoErrado?.module).toBe('Geral')
+    expect(semTitulo).toBe(null)
+  })
+
+  it('previsão sai da complexidade e nunca é o prazo', () => {
+    const base = new Date('2026-07-28T00:00:00.000Z')
+
+    expect(suggestForecast('Baixa', base)).toBe('30/07')
+    expect(suggestForecast('Média', base)).toBe('02/08')
+    expect(suggestForecast('Alta', base)).toBe('07/08')
+
+    const sugerido = suggestTaskFields(initialState, { title: 'Corrigir planta do loteamento', project: 'VistaFor' }, base)
+    expect(sugerido).toMatchObject({ complexity: 'Média', forecast: '02/08' })
+  })
+
+  it('grava descrição e previsão do card, e limpa quando vêm vazias', () => {
+    const criado = addTask(initialState, {
+      title: 'Ajustar planta',
+      description: '  Trava ao abrir o mapa.  ',
+      project: 'VistaFor',
+      forecast: ' 04/08 ',
+    })
+    const limpo = updateTask(criado, criado.tasks[0].id, { description: '   ', forecast: '   ' })
+
+    expect(criado.tasks[0]).toMatchObject({ description: 'Trava ao abrir o mapa.', forecast: '04/08' })
+    expect(limpo.tasks[0].description).toBeUndefined()
+    expect(limpo.tasks[0].forecast).toBeUndefined()
+  })
+
+  it('etiqueta é do projeto: lista vira conjunto e a que sai deixa os cards', () => {
+    const comEtiquetas = setProjectTags(initialState, 'vistafor', [
+      { name: ' raster ' },
+      { name: 'RASTER' },
+      { name: 'nova' },
+    ])
+    const projeto = comEtiquetas.projects.find((item) => item.id === 'vistafor')!
+
+    // "RASTER" repete "raster" só no caixa; a etiqueta que já existia mantém o id.
+    expect(projeto.tags.map((tag) => tag.name)).toEqual(['raster', 'nova'])
+    expect(projeto.tags[0].id).toBe('tag-vistafor-raster')
+    // "CEGEO" ficou fora da lista, então sai do projeto e do card que a usava.
+    expect(projeto.tags.some((tag) => tag.name === 'CEGEO')).toBe(false)
+    expect(comEtiquetas.tasks.find((task) => task.id === 'task-1')?.tagIds).toEqual([])
+    expect(comEtiquetas.tasks.find((task) => task.id === 'task-2')?.tagIds).toEqual(['tag-vistafor-raster'])
+  })
+
+  it('vincula etiqueta ao card e descarta a de outro projeto', () => {
+    const valida = setTaskTags(initialState, 'task-1', ['tag-vistafor-raster', 'tag-intranet-seguranca', 'tag-inexistente'])
+    const semCard = setTaskTags(initialState, 'nao-existe', ['tag-vistafor-raster'])
+
+    expect(valida.tasks.find((task) => task.id === 'task-1')?.tagIds).toEqual(['tag-vistafor-raster'])
+    expect(taskTags(valida, valida.tasks.find((task) => task.id === 'task-1')!).map((tag) => tag.name)).toEqual(['raster'])
+    expect(semCard).toBe(initialState)
+  })
+
+  it('trocar o projeto do card zera etiquetas e marcos, que são do projeto antigo', () => {
+    const movido = updateTask(initialState, 'task-1', { project: 'Intranet' })
+    const task = movido.tasks.find((item) => item.id === 'task-1')!
+
+    expect(task.project).toBe('Intranet')
+    expect(task.tagIds).toEqual([])
+    expect(task.milestoneIds).toEqual([])
+  })
+
+  it('contexto exige projeto, título e conteúdo, e aceita card do mesmo projeto', () => {
+    const criado = addContext(initialState, {
+      projectId: 'vistafor',
+      title: '  Medidas passam pela CEGEO  ',
+      content: '  Regra combinada com a equipe.  ',
+      taskId: 'task-1',
+    })
+    const cardDeOutroProjeto = addContext(initialState, {
+      projectId: 'vistafor',
+      title: 'Regra',
+      content: 'Texto',
+      taskId: 'task-3',
+    })
+    const semTitulo = addContext(initialState, { projectId: 'vistafor', title: '  ', content: 'Texto' })
+    const semProjeto = addContext(initialState, { projectId: 'nao-existe', title: 'Regra', content: 'Texto' })
+
+    expect(criado.contexts[0]).toMatchObject({
+      projectId: 'vistafor',
+      title: 'Medidas passam pela CEGEO',
+      content: 'Regra combinada com a equipe.',
+      taskId: 'task-1',
+    })
+    expect(cardDeOutroProjeto.contexts[0].taskId).toBeUndefined()
+    expect(semTitulo).toBe(initialState)
+    expect(semProjeto).toBe(initialState)
+  })
+
+  it('edita e remove contexto, e o escopo isola por projeto', () => {
+    const criado = addContext(initialState, { projectId: 'intranet', title: 'Perfis', content: 'Texto inicial.' })
+    const contextId = criado.contexts[0].id
+    const editado = updateContext(criado, contextId, { title: 'Perfis revisados', content: 'Texto final.', taskId: 'task-3' })
+    const vazio = updateContext(editado, contextId, { title: '   ', content: 'Texto', taskId: undefined })
+    const removido = removeContext(editado, contextId)
+
+    expect(editado.contexts[0]).toMatchObject({ title: 'Perfis revisados', content: 'Texto final.', taskId: 'task-3' })
+    expect(vazio).toBe(editado)
+    expect(removido.contexts.some((context) => context.id === contextId)).toBe(false)
+    expect(scopeContexts(editado, projectScope('intranet')).map((context) => context.title)).toEqual(['Perfis revisados'])
+    expect(scopeContexts(editado, projectScope('vistoria'))).toEqual([])
+  })
+
+  it('arrastar nota grava posição no meio dos vizinhos da mesma seção', () => {
+    const base: AppState = {
+      ...initialState,
+      notes: [
+        { ...initialState.notes[0], id: 'a', projectId: 'vistafor', pinned: false, position: 0 },
+        { ...initialState.notes[0], id: 'b', projectId: 'vistafor', pinned: false, position: 1 },
+        { ...initialState.notes[0], id: 'c', projectId: 'vistafor', pinned: false, position: 2 },
+      ],
+    }
+    const meio = reorderNotes(base, 'c', 'b')
+    const fim = reorderNotes(base, 'a')
+
+    expect(meio.notes.map((note) => note.id)).toEqual(['a', 'c', 'b'])
+    expect(meio.notes.find((note) => note.id === 'c')?.position).toBe(0.5)
+    expect(fim.notes.map((note) => note.id)).toEqual(['b', 'c', 'a'])
+    expect(fim.notes.find((note) => note.id === 'a')?.position).toBe(3)
+  })
+
+  it('nota nova entra na frente e aceita card do próprio projeto apenas', () => {
+    const criada = addNote(initialState, { title: 'Nota', content: 'Texto', projectId: 'vistafor', taskId: 'task-1' })
+    const cardDeOutroProjeto = addNote(initialState, { title: 'Nota', content: 'Texto', projectId: 'vistafor', taskId: 'task-3' })
+
+    expect(criada.notes[0].taskId).toBe('task-1')
+    expect(criada.notes[0].position).toBeLessThan(Math.min(...initialState.notes.map((note) => note.position)))
+    expect(cardDeOutroProjeto.notes[0].taskId).toBeUndefined()
   })
 
   it('completar tarefa tira tarefa do plano ativo sem apagar histórico', () => {
@@ -330,23 +524,28 @@ describe('Central de Projetos — fluxos críticos', () => {
     const created = addNote(initialState, {
       title: 'Decisão da reunião',
       content: '  Validar novo fluxo com a equipe.  ',
+      projectId: 'observa',
     })
-    const ignored = addNote(created, { title: '', content: '   ' })
+    const ignored = addNote(created, { title: '', content: '   ', projectId: 'observa' })
+    const withoutProject = addNote(created, { title: 'Solta', content: 'Sem projeto.', projectId: '' })
 
     expect(created.notes[0]).toMatchObject({
       title: 'Decisão da reunião',
       content: 'Validar novo fluxo com a equipe.',
+      projectId: 'observa',
       visibility: 'Privada',
       availableToAi: false,
       availableToMcp: false,
     })
     expect(ignored).toBe(created)
+    expect(withoutProject).toBe(created)
   })
 
   it('converte nota em um único card e exige projeto válido', () => {
     const withNote = addNote(initialState, {
       title: 'Revisar painel ambiental',
       content: 'Conferir indicadores antes da publicação.',
+      projectId: 'observa',
     })
     const note = withNote.notes[0]
     const withoutProject = convertNoteToTask(withNote, note.id, '')
@@ -370,6 +569,7 @@ describe('Central de Projetos — fluxos críticos', () => {
     const withNote = addNote(initialState, {
       title: 'Planejar próxima entrega',
       content: 'Listar riscos antes da reunião.',
+      projectId: 'vistafor',
     })
     const note = withNote.notes[0]
     const pinned = toggleNotePinned(withNote, note.id)
@@ -387,30 +587,35 @@ describe('Central de Projetos — fluxos críticos', () => {
     const first = addNote(initialState, {
       title: 'VistaFor',
       content: 'Revisar permissões do mapa.',
+      projectId: 'vistafor',
     })
     const second = addNote(first, {
       title: 'Observa',
       content: 'Conferir indicadores ambientais.',
+      projectId: 'observa',
     })
 
     expect(filterNotes(second.notes, 'mapa').map((note) => note.title)).toEqual(['VistaFor'])
     expect(filterNotes(second.notes, 'OBSERVA').map((note) => note.title)).toEqual(['Observa'])
-    expect(second.notes).toHaveLength(2)
+    expect(second.notes).toHaveLength(initialState.notes.length + 2)
   })
 
   it('edita título e conteúdo sem perder privacidade ou pinagem', () => {
     const withNote = addNote(initialState, {
       title: 'Rascunho',
       content: 'Texto inicial.',
+      projectId: 'intranet',
     })
     const pinned = toggleNotePinned(withNote, withNote.notes[0].id)
     const updated = updateNote(pinned, withNote.notes[0].id, {
       title: '  Decisão final  ',
       content: '  Texto revisado.  ',
+      taskId: undefined,
     })
     const rejected = updateNote(updated, withNote.notes[0].id, {
       title: 'Sem conteúdo',
       content: '   ',
+      taskId: undefined,
     })
 
     expect(updated.notes[0]).toMatchObject({
@@ -422,5 +627,45 @@ describe('Central de Projetos — fluxos críticos', () => {
       availableToMcp: false,
     })
     expect(rejected).toBe(updated)
+  })
+
+  it('escopo global entrega apenas dados de projetos ativos', () => {
+    const archived = toggleProjectArchived(initialState, 'intranet')
+
+    expect(scopeProject(archived, globalScope)).toBeUndefined()
+    expect(scopeProjects(archived, globalScope).map((project) => project.id)).toEqual(['vistafor', 'observa', 'vistoria'])
+    expect(scopeTasks(archived, globalScope).every((task) => task.project !== 'Intranet')).toBe(true)
+    expect(scopeMilestones(archived, globalScope).every((milestone) => milestone.project !== 'Intranet')).toBe(true)
+  })
+
+  it('escopo de projeto isola tarefas, marcos e notas do projeto escolhido', () => {
+    const withNotes = addNote(
+      addNote(initialState, { title: 'Mapa', content: 'Revisar camadas.', projectId: 'vistafor' }),
+      { title: 'Indicadores', content: 'Conferir séries.', projectId: 'observa' },
+    )
+    const scope = projectScope('vistafor')
+
+    expect(scopeProject(withNotes, scope)?.name).toBe('VistaFor')
+    expect(scopeTasks(withNotes, scope).every((task) => task.project === 'VistaFor')).toBe(true)
+    expect(scopeMilestones(withNotes, scope).every((milestone) => milestone.project === 'VistaFor')).toBe(true)
+    expect(scopeNotes(withNotes, scope).every((note) => note.projectId === 'vistafor')).toBe(true)
+    expect(scopeNotes(withNotes, scope).map((note) => note.title)).toContain('Mapa')
+    expect(scopeNotes(withNotes, globalScope)).toHaveLength(initialState.notes.length + 2)
+  })
+
+  it('projeto arquivado continua acessível quando o usuário navega direto para ele', () => {
+    const archived = toggleProjectArchived(initialState, 'intranet')
+    const scope = projectScope('intranet')
+
+    expect(scopeProject(archived, scope)?.archived).toBe(true)
+    expect(scopeTasks(archived, scope).map((task) => task.id)).toEqual(['task-3'])
+  })
+
+  it('escopo de projeto inexistente não vaza dados de outros projetos', () => {
+    const scope = projectScope('nao-existe')
+
+    expect(scopeProjects(initialState, scope)).toEqual([])
+    expect(scopeTasks(initialState, scope)).toEqual([])
+    expect(scopeMilestones(initialState, scope)).toEqual([])
   })
 })

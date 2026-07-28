@@ -1,26 +1,32 @@
 'use client'
 
-import { CalendarBlank, CaretLeft, CaretRight, Clock, DotsSixVertical, Flag, Tray, X } from '@phosphor-icons/react'
+import { CalendarBlank, CaretLeft, CaretRight, Clock, DotsSixVertical, Flag, Plus, Tray, X } from '@phosphor-icons/react'
 import { useMemo, useState, type CSSProperties } from 'react'
 import { dragHandleProps, useDropZone } from './dnd'
-import { getMilestoneProgress, updateTask, type AppState, type Milestone, type Task } from './domain'
+import { getMilestoneProgress, scopeMilestones, scopeTasks, type AppState, type Milestone, type Scope, type Task } from './domain'
+import type { ProjectActions } from './lib/store'
 import { formatDate, MilestoneBadges, slug } from './milestones'
 import { buildRoadmapWeek, formatRoadmapWeekRange, groupMilestonesByRoadmapDay, groupTasksByRoadmapDay, type RoadmapDayWithTasks } from './roadmap'
+import type { TaskCreateDefaults } from './taskCreate'
 
 type RoadmapProps = {
   state: AppState
-  setState: (state: AppState) => void
+  scope: Scope
+  actions: ProjectActions
   notify: (message: string) => void
   onOpen: (task: Task) => void
+  onCreateTask: (defaults?: TaskCreateDefaults) => void
 }
 
-export function RoadmapView({ state, setState, notify, onOpen }: RoadmapProps) {
+export function RoadmapView({ state, scope, actions, notify, onOpen, onCreateTask }: RoadmapProps) {
   const [anchor, setAnchor] = useState(() => new Date())
   const [selectedMilestoneId, setSelectedMilestoneId] = useState<string | null>(null)
+  const tasks = useMemo(() => scopeTasks(state, scope), [state, scope])
+  const milestones = useMemo(() => scopeMilestones(state, scope), [state, scope])
   const days = useMemo(() => buildRoadmapWeek(anchor), [anchor])
-  const roadmap = useMemo(() => groupTasksByRoadmapDay(state.tasks, days), [days, state.tasks])
-  const milestoneDays = useMemo(() => groupMilestonesByRoadmapDay(state.milestones, days), [days, state.milestones])
-  const selectedMilestone = state.milestones.find((milestone) => milestone.id === selectedMilestoneId)
+  const roadmap = useMemo(() => groupTasksByRoadmapDay(tasks, days), [days, tasks])
+  const milestoneDays = useMemo(() => groupMilestonesByRoadmapDay(milestones, days), [days, milestones])
+  const selectedMilestone = milestones.find((milestone) => milestone.id === selectedMilestoneId)
 
   function moveWeek(offset: number) {
     setAnchor((current) => {
@@ -31,10 +37,7 @@ export function RoadmapView({ state, setState, notify, onOpen }: RoadmapProps) {
   }
 
   function schedule(taskId: string, due: string) {
-    const next = updateTask(state, taskId, { due })
-    if (next === state) return
-    setState(next)
-    notify(due ? `Demanda movida para ${due}` : 'Demanda voltou para sem data')
+    void actions.updateTask(taskId, { due })
   }
 
   return <div className="view-panel roadmap-board">
@@ -51,7 +54,7 @@ export function RoadmapView({ state, setState, notify, onOpen }: RoadmapProps) {
       </div>
     </div>
 
-    {selectedMilestone && <MilestoneSummary milestone={selectedMilestone} tasks={state.tasks} onClose={() => setSelectedMilestoneId(null)} onOpen={onOpen} />}
+    {selectedMilestone && <MilestoneSummary milestone={selectedMilestone} tasks={tasks} onClose={() => setSelectedMilestoneId(null)} onOpen={onOpen} />}
 
     <div className="roadmap-scroll">
       <div className="roadmap-week-grid">
@@ -59,21 +62,23 @@ export function RoadmapView({ state, setState, notify, onOpen }: RoadmapProps) {
           key={day.key}
           day={day}
           milestones={milestoneDays.find((item) => item.key === day.key)?.milestones ?? []}
-          allMilestones={state.milestones}
+          allMilestones={milestones}
           selectedMilestoneId={selectedMilestoneId}
-          tasks={state.tasks}
+          tasks={tasks}
           onSelectMilestone={setSelectedMilestoneId}
           onSchedule={schedule}
           onOpen={onOpen}
+          // `day.key` é DD/MM, mesmo formato que o arraste grava em `due`.
+          onCreate={() => onCreateTask({ due: day.key })}
         />)}
       </div>
     </div>
 
-    <UnscheduledTray tasks={roadmap.unscheduled} milestones={state.milestones} onSchedule={schedule} onOpen={onOpen} />
+    <UnscheduledTray tasks={roadmap.unscheduled} milestones={milestones} onSchedule={schedule} onOpen={onOpen} />
   </div>
 }
 
-function RoadmapDayColumn({ day, milestones, allMilestones, selectedMilestoneId, tasks, onSelectMilestone, onSchedule, onOpen }: {
+function RoadmapDayColumn({ day, milestones, allMilestones, selectedMilestoneId, tasks, onSelectMilestone, onSchedule, onOpen, onCreate }: {
   day: RoadmapDayWithTasks
   milestones: Milestone[]
   allMilestones: Milestone[]
@@ -82,6 +87,7 @@ function RoadmapDayColumn({ day, milestones, allMilestones, selectedMilestoneId,
   onSelectMilestone: (id: string) => void
   onSchedule: (taskId: string, due: string) => void
   onOpen: (task: Task) => void
+  onCreate: () => void
 }) {
   const zone = useDropZone((item) => item.type === 'task' && item.from !== day.key, (item) => onSchedule(item.id, day.key))
 
@@ -91,6 +97,7 @@ function RoadmapDayColumn({ day, milestones, allMilestones, selectedMilestoneId,
       <strong>{day.day}</strong>
       <small>{day.month}</small>
       <em>{day.tasks.length}</em>
+      <button className="column-add" aria-label={`Nova tarefa em ${day.key}`} onClick={onCreate}><Plus size={14} weight="bold" /></button>
     </header>
     {milestones.length > 0 && <div className="roadmap-milestones">{milestones.map((milestone) =>
       <RoadmapMilestone key={milestone.id} milestone={milestone} tasks={tasks} active={milestone.id === selectedMilestoneId} onSelect={() => onSelectMilestone(milestone.id)} />)}</div>}
@@ -152,6 +159,6 @@ function RoadmapCard({ task, from, milestones, onOpen, compact = false }: { task
     <strong>{task.title}</strong>
     <MilestoneBadges milestoneIds={task.milestoneIds} milestones={milestones} />
     <small>{task.module ?? 'Geral'} · {task.status}</small>
-    <span className="roadmap-demand-time"><Clock size={13} />{task.time === '—' ? 'Sem horário' : task.time}<em>{task.duration}</em></span>
+    <span className="roadmap-demand-time"><Clock size={13} />{task.due ?? 'Sem prazo'}<em>{task.complexity ?? 'A estimar'}</em></span>
   </div>
 }

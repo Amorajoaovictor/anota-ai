@@ -15,7 +15,6 @@ import { useMemo, useState, type ReactNode } from 'react'
 import {
   addInboxItem,
   analyzeInboxItem,
-  confirmInboxItem,
   discardInboxItem,
   updateInboxSuggestion,
   type AppState,
@@ -24,10 +23,12 @@ import {
   type InboxItem,
   type Priority,
 } from './domain'
+import type { ProjectActions } from './lib/store'
 
 type ContextFlowProps = {
   state: AppState
   setState: (state: AppState) => void
+  actions: ProjectActions
   notify: (message: string) => void
 }
 
@@ -173,7 +174,7 @@ function InboxCard({ item, onOpen }: { item: InboxItem; onOpen: () => void }) {
   </article>
 }
 
-function ContextReviewPanel({ state, setState, notify, item, onBack }: ContextFlowProps & { item: InboxItem; onBack: () => void }) {
+function ContextReviewPanel({ state, setState, actions, notify, item, onBack }: ContextFlowProps & { item: InboxItem; onBack: () => void }) {
   const suggestion = item.suggestion as ContextSuggestion
   const [draft, setDraft] = useState<ContextSuggestion>(suggestion)
   const projects = useMemo(() => state.projects.map((project) => project.name), [state.projects])
@@ -183,9 +184,9 @@ function ContextReviewPanel({ state, setState, notify, item, onBack }: ContextFl
   }
 
   function confirm() {
-    const corrected = updateInboxSuggestion(state, item.id, draft)
-    setState(confirmInboxItem(corrected, item.id))
-    notify('Tarefa criada no Backlog com contexto registrado.')
+    // A correção do usuário entra antes: é ela que vira o card gravado.
+    setState(updateInboxSuggestion(state, item.id, draft))
+    void actions.confirmInbox(item.id)
     onBack()
   }
 

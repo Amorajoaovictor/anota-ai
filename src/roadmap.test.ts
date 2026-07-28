@@ -2,14 +2,12 @@ import { describe, expect, it } from 'vitest'
 import { buildRoadmapWeek, groupMilestonesByRoadmapDay, groupTasksByRoadmapDay } from './roadmap'
 import type { Milestone, Task } from './domain'
 
-const makeTask = (id: string, due?: string): Task => ({
+const makeTask = (id: string, due?: string, priority: Task['priority'] = 'P1'): Task => ({
   id,
   title: `Demanda ${id}`,
   project: 'VistaFor',
   status: 'Backlog',
-  priority: 'P1',
-  time: '09:00',
-  duration: '1h',
+  priority,
   due,
   color: '#68d7a7',
 })
@@ -29,6 +27,18 @@ describe('Roadmap semanal', () => {
 
     expect(friday?.tasks.map((task) => task.id)).toEqual(['1', '2', '3', '4'])
     expect(new Set(friday?.tasks.map((task) => task.id)).size).toBe(4)
+  })
+
+  it('ordena o dia por prioridade, já que o card não tem horário', () => {
+    const days = buildRoadmapWeek(new Date(2026, 6, 24))
+    const result = groupTasksByRoadmapDay([
+      makeTask('baixa', '24/07', 'P3'),
+      makeTask('critica', '24/07', 'P0'),
+      makeTask('media', '24/07', 'P2'),
+    ], days)
+
+    expect(result.days.find((day) => day.key === '24/07')?.tasks.map((task) => task.id))
+      .toEqual(['critica', 'media', 'baixa'])
   })
 
   it('preserva demandas sem prazo em uma fila separada', () => {

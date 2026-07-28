@@ -8,9 +8,13 @@
     "build": "prisma generate && next build",
     "start": "next start",
     "worker": "tsx src/server/jobs/worker-cli.ts",
+    "db:seed": "tsx --env-file=.env.local prisma/seed.ts",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "prisma": {
+    "seed": "tsx --env-file=.env.local prisma/seed.ts"
   },
   "dependencies": {
     "@neondatabase/auth": "^0.4.2-beta",

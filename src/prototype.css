@@ -339,6 +339,13 @@
 .task-milestone-selector small { color: #697679; font-size: 8px; }
 .task-milestone-selector > span { color: #737f81; font-size: 10px; }
 
+.dependency-options { display: grid; gap: 6px; margin: 5px 0 4px; }
+.dependency-option { display: grid; grid-template-columns: auto 1fr auto; gap: 9px; align-items: center; border: 1px solid #2d393c; border-radius: 6px; background: #101719; padding: 8px 9px; color: #bdc7c3; font-size: 10.5px; cursor: pointer; transition: border-color .16s var(--ease); }
+.dependency-option:hover { border-color: var(--line-strong); }
+.dependency-option.active { border-color: var(--green-line); }
+.dependency-option input { accent-color: var(--green); }
+.dependency-option small { color: #697679; font-size: 8.5px; }
+
 .kanban-milestone-toolbar { display: flex; align-items: center; gap: 14px; margin: 0 42px 14px; padding: 12px 14px; border: 1px solid #304039; border-radius: 7px; background: #111a18; }
 .kanban-milestone-toolbar > div { display: flex; align-items: center; gap: 9px; min-width: 230px; }
 .kanban-milestone-toolbar svg { color: var(--green); }
@@ -508,6 +515,15 @@ body { background: var(--bg); }
 .topbar .search:hover { border-color: #3c4d52; color: #a7b3b3; }
 .top-actions button { width: 34px; height: 34px; display: grid; place-items: center; border-radius: var(--r-md); transition: background .16s var(--ease), color .16s var(--ease); }
 .top-actions button:hover { background: #16201f; color: var(--text); }
+.top-actions .topbar-create { width: auto; gap: 7px; display: inline-flex; padding: 0 13px; border: 1px solid var(--green-line); background: #16211d; color: var(--green); font-size: 12px; font-weight: 600; }
+.top-actions .topbar-create:hover { background: #1d2e27; color: var(--green); }
+
+/* Criação a partir do cabeçalho de uma coluna do Kanban ou de um dia do roadmap. */
+.column-add { width: 22px; height: 22px; display: grid; place-items: center; border: 1px solid var(--line-strong); border-radius: 6px; background: transparent; color: var(--muted); transition: border-color .16s var(--ease), background .16s var(--ease), color .16s var(--ease); }
+.column-add:hover { border-color: var(--green-line); background: #16211d; color: var(--green); }
+.kanban-column > header { gap: 8px; }
+.kanban-column > header em { margin-left: auto; }
+.roadmap-day > header .column-add { position: absolute; right: 9px; bottom: 9px; }
 
 .page-heading h1 { letter-spacing: -.045em; }
 .section-heading .heading-subtitle { margin: 10px 0 0; max-width: 560px; color: var(--muted); font-size: 12.5px; line-height: 1.55; }
@@ -583,6 +599,11 @@ input, select, textarea { font-family: 'DM Sans', sans-serif; }
 .ui-modal-body { flex: 1; overflow-y: auto; padding: 20px 22px; }
 .ui-modal-footer { display: flex; align-items: center; justify-content: flex-end; gap: 10px; padding: 15px 22px; border-top: 1px solid var(--line); background: #0f1618; }
 .ui-modal-hint { margin-right: auto; color: #74817f; font-size: 10px; }
+.ui-modal-footer .ui-suggest { margin-right: auto; gap: 7px; }
+.ui-suggestion { display: flex; align-items: center; gap: 9px; margin: 16px 0 0; padding: 9px 12px; border: 1px solid var(--green-line); border-radius: var(--r-md); background: #101c18; color: var(--text-2); font-size: 11.5px; line-height: 1.5; }
+.ui-suggestion svg { color: var(--green); flex-shrink: 0; }
+.ui-suggestion b { color: var(--text); font-weight: 600; }
+.ui-suggestion button { margin-left: auto; flex-shrink: 0; border: 0; background: none; color: var(--green); font-size: 11px; text-decoration: underline; }
 .ui-confirm-text { margin: 0; color: var(--text-2); font-size: 13px; line-height: 1.65; }
 
 @keyframes ui-fade { from { opacity: 0 } to { opacity: 1 } }
@@ -777,6 +798,7 @@ th { letter-spacing: .1em; text-transform: uppercase; }
   .ui-modal-center { width: 100%; max-height: 92vh; border-radius: var(--r-xl) var(--r-xl) 0 0; animation: ui-slide-up .22s var(--ease); }
   .ui-modal-sheet { width: 100%; }
   .ui-form { grid-template-columns: 1fr; }
+  .topbar-create span { display: none; }
   .ui-modal-footer { flex-wrap: wrap; }
   .ui-modal-footer .primary-button, .ui-modal-footer .danger-button { flex: 1; justify-content: center; }
 }
@@ -785,4 +807,78 @@ th { letter-spacing: .1em; text-transform: uppercase; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
+
+/* Abas de projeto — escopo travado em um projeto (ver arquitetura-navegacao.md) */
+.project-tabs { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; padding: 14px 42px 0; }
+.project-tabs-back { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; color: var(--muted); font-size: 12px; padding: 6px 8px; border-radius: 6px; }
+.project-tabs-back:hover { color: #e7efea; background: #192123; }
+.project-tabs-name { display: inline-flex; align-items: center; gap: 7px; font: 600 13px 'Space Grotesk'; color: #eef4f0; margin-right: 10px; }
+.project-tabs-name i { width: 8px; height: 8px; border-radius: 50%; }
+.project-tab { border: 1px solid transparent; background: none; color: #9da7ab; font-size: 12px; padding: 7px 12px; border-radius: 999px; }
+.project-tab:hover { color: #f4faf5; background: #192123; }
+.project-tab.active { color: var(--green); border-color: #3c5c51; background: #16251f; }
+.recent-project.active { color: #f4faf5; background: #192123; border-radius: 7px; }
+.project-card-actions { display: flex; flex-direction: column; gap: 6px; }
+
+/* Visão geral do projeto (PRD 12.8) */
+.overview-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; max-width: 1480px; margin: auto; padding: 0 42px 16px; }
+.overview-grid .view-panel { margin: 0; }
+.overview-grid h3 { margin: 0 0 12px; font: 600 13px 'Space Grotesk'; color: #eef4f0; }
+.overview-grid small { display: block; font-size: 10px; letter-spacing: .12em; color: #788286; margin-bottom: 8px; }
+.overview-progress strong { font: 700 30px 'Space Grotesk'; color: #f2f8f3; }
+.overview-progress > span { display: block; margin-top: 9px; font-size: 11px; color: #83908f; }
+.overview-next strong { display: block; font: 600 14px 'Space Grotesk'; color: #eef4f0; }
+.overview-next span { font-size: 11px; color: #83908f; }
+.overview-next p { margin: 0; font-size: 12px; color: #83908f; }
+.overview-link { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 0; color: inherit; }
+.overview-link:hover strong { color: var(--green); }
+.overview-status-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.overview-status-list li { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: #c3cdca; }
+.overview-status-list b { color: #eef4f0; font-size: 13px; }
+.overview-tags { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 16px; }
+.overview-tags span { border: 1px solid var(--line); border-radius: 999px; padding: 4px 10px; font-size: 11px; color: #c3cdca; }
+.overview-tags em { font-size: 12px; color: #83908f; font-style: normal; }
+
+/* Notas com projeto */
+.keep-composer-project { width: 100%; margin: 6px 0 2px; border: 1px solid #2b3639; border-radius: 6px; background: #0f1517; color: #dce5e1; font: 12px 'DM Sans'; padding: 8px 9px; }
+.keep-card-project { display: block; margin-bottom: 6px; font-size: 10px; letter-spacing: .08em; text-transform: uppercase; color: #77827f; }
+
+@media (max-width: 760px) {
+  .project-tabs { padding: 12px 16px 0; }
+  .overview-grid { padding: 0 16px 16px; }
+}
+
+/* Fase 3 — etiquetas, previsão, descrição e contexto do projeto */
+.tag-chips { display: inline-flex; flex-wrap: wrap; gap: 5px; }
+.tag-chip { display: inline-flex; align-items: center; border: 1px solid color-mix(in srgb, var(--tag-color) 35%, #2d393c); border-radius: 10px; background: color-mix(in srgb, var(--tag-color) 12%, #151d20); color: color-mix(in srgb, var(--tag-color) 70%, #dfe8e3); padding: 3px 7px; font-size: 9px; white-space: nowrap; }
+.tag-chips-empty { color: #697679; }
+
+.tag-selector { display: flex; flex-wrap: wrap; gap: 6px; margin: 5px 0 4px; }
+.tag-option { display: inline-grid; grid-template-columns: auto 7px auto; gap: 7px; align-items: center; border: 1px solid #2d393c; border-radius: 14px; background: #101719; padding: 6px 11px 6px 9px; color: #bdc7c3; font-size: 10.5px; cursor: pointer; }
+.tag-option:hover { border-color: color-mix(in srgb, var(--tag-color) 45%, #2d393c); }
+.tag-option.active { border-color: color-mix(in srgb, var(--tag-color) 55%, #2d393c); background: color-mix(in srgb, var(--tag-color) 12%, #101719); }
+.tag-option input { accent-color: var(--green); }
+.tag-option i { width: 7px; height: 7px; border-radius: 50%; background: var(--tag-color); }
+
+.detail-description { margin: 4px 0 14px; color: #bdc7c3; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.ui-form-hint { margin: 2px 0 0; color: var(--muted); font-size: 10px; }
+
+.project-context-list { padding: 0 42px 30px; }
+.project-context-card { margin: 0 0 10px; display: grid; gap: 10px; }
+.project-context-card > header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.project-context-card > header strong { font: 600 14px 'Space Grotesk'; }
+.project-context-card > header div { display: flex; gap: 10px; flex-shrink: 0; }
+.project-context-card > p { margin: 0; color: #bdc7c3; font-size: 12px; line-height: 1.6; white-space: pre-wrap; }
+.project-context-card > footer { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 11px; border-top: 1px solid var(--line); }
+.project-context-card > footer small { color: var(--muted); font-size: 10px; }
+.project-context-task { display: inline-flex; align-items: center; gap: 7px; border: 1px solid #2d393c; border-radius: 12px; background: #101719; color: #bdc7c3; padding: 5px 10px; font-size: 10px; }
+.project-context-task:hover { border-color: var(--green); color: var(--green); }
+.project-context-task i { width: 7px; height: 7px; border-radius: 50%; }
+.project-context-hint { margin: 14px 0 0; color: var(--muted); font-size: 10px; }
+
+.keep-card-task { display: inline-flex; align-items: center; gap: 5px; margin-top: 8px; color: #8b9896; font-size: 10px; }
+
+@media (max-width: 760px) {
+  .project-context-list { padding: 0 16px 20px; }
 }
