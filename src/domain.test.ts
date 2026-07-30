@@ -45,6 +45,8 @@ import {
   scopeProject,
   scopeProjects,
   scopeTasks,
+  searchAll,
+  sortActionPlanByPriority,
   suggestTaskFields,
   type AppState,
 } from './domain'
@@ -667,5 +669,70 @@ describe('Central de Projetos — fluxos críticos', () => {
     expect(scopeProjects(initialState, scope)).toEqual([])
     expect(scopeTasks(initialState, scope)).toEqual([])
     expect(scopeMilestones(initialState, scope)).toEqual([])
+  })
+
+  it('busca vazia não retorna nada', () => {
+    expect(searchAll(initialState, '')).toEqual([])
+    expect(searchAll(initialState, '   ')).toEqual([])
+  })
+
+  it('busca por alias encontra o projeto pelo nome alternativo', () => {
+    const hits = searchAll(initialState, 'PAX')
+    expect(hits.some((hit) => hit.kind === 'project' && hit.title === 'VistaFor')).toBe(true)
+  })
+
+  it('busca por tarefa traz o projeto e o status no subtítulo', () => {
+    const hits = searchAll(initialState, 'exclusão de medidas')
+    const hit = hits.find((item) => item.kind === 'task')
+    expect(hit?.title).toBe('Corrigir exclusão de medidas')
+    expect(hit?.subtitle).toContain('VistaFor')
+    expect(hit?.subtitle).toContain('Backlog')
+  })
+
+  it('busca por nota resolve o nome do projeto pelo projectId', () => {
+    const hits = searchAll(initialState, 'CEGEO antes de mexer')
+    const hit = hits.find((item) => item.kind === 'note')
+    expect(hit?.subtitle).toBe('VistaFor')
+  })
+
+  it('teto por grupo limita cada tipo separadamente', () => {
+    const hits = searchAll(initialState, 'a', 1)
+    const perGroup = new Map<string, number>()
+    for (const hit of hits) perGroup.set(hit.kind, (perGroup.get(hit.kind) ?? 0) + 1)
+    for (const count of perGroup.values()) expect(count).toBeLessThanOrEqual(1)
+  })
+
+  it('prefixo exato aparece antes de substring dentro do mesmo grupo', () => {
+    const hits = searchAll(initialState, 'vis', 10)
+    const projectHits = hits.filter((hit) => hit.kind === 'project').map((hit) => hit.title)
+    expect(projectHits).toEqual(['VistaFor', 'App Vistoria'])
+  })
+
+  it('ordena o plano por prioridade e, dentro dela, por prazo mais próximo', () => {
+    const state: AppState = {
+      ...initialState,
+      actionPlan: [
+        { ...initialState.tasks[3]!, priority: 'P2', due: '30/07' },
+        { ...initialState.tasks[0]!, priority: 'P0', due: '24/07' },
+        { ...initialState.tasks[2]!, priority: 'P1', due: '24/07' },
+        { ...initialState.tasks[4]!, priority: 'P2', due: '20/07' },
+      ],
+    }
+    const sorted = sortActionPlanByPriority(state)
+    expect(sorted.actionPlan.map((task) => task.priority)).toEqual(['P0', 'P1', 'P2', 'P2'])
+    const p2 = sorted.actionPlan.filter((task) => task.priority === 'P2')
+    expect(p2.map((task) => task.due)).toEqual(['20/07', '30/07'])
+  })
+
+  it('tarefa sem prazo vai para o fim do próprio grupo de prioridade', () => {
+    const state: AppState = {
+      ...initialState,
+      actionPlan: [
+        { ...initialState.tasks[4]!, priority: 'P2', due: '20/07' },
+        { ...initialState.tasks[3]!, priority: 'P2', due: undefined },
+      ],
+    }
+    const sorted = sortActionPlanByPriority(state)
+    expect(sorted.actionPlan.map((task) => task.due)).toEqual(['20/07', undefined])
   })
 })

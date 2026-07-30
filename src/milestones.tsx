@@ -1,6 +1,6 @@
 'use client'
 
-import { CalendarBlank, CheckCircle, DotsSixVertical, Eye, Flag, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
+import { CalendarBlank, CheckCircle, CloudSlash, DotsSixVertical, Eye, Flag, PencilSimple, Plus, Trash } from '@phosphor-icons/react'
 import { useMemo, useState, type FormEvent } from 'react'
 import { dragHandleProps, useDropZone } from './dnd'
 import {
@@ -11,7 +11,6 @@ import {
   scopeProject,
   scopeProjects,
   scopeTasks,
-  setTaskMilestones,
   updateMilestone,
   type AppState,
   type Milestone,
@@ -19,7 +18,9 @@ import {
   type Scope,
   type Task,
 } from './domain'
-import { ConfirmDialog, Modal } from './ui'
+import { formatDate, slug } from './format'
+import type { ProjectActions } from './lib/store'
+import { Badge, Button, ConfirmDialog, EmptyState, Modal, PageHeading, type Notify } from './ui'
 
 export const milestoneStatuses: MilestoneStatus[] = ['Planejado', 'Em andamento', 'Atingido', 'Adiado', 'Cancelado']
 
@@ -27,13 +28,15 @@ export function MilestonesView({
   state,
   scope,
   setState,
+  actions,
   notify,
   onOpenTask,
 }: {
   state: AppState
   scope: Scope
   setState: (state: AppState) => void
-  notify: (message: string) => void
+  actions: ProjectActions
+  notify: Notify
   onOpenTask: (task: Task) => void
 }) {
   const scoped = scopeProject(state, scope)
@@ -60,47 +63,51 @@ export function MilestonesView({
     event.preventDefault()
     if (!draft) return
     const next = addMilestone(state, draft)
-    if (next === state) return notify('Informe nome, projeto e data-alvo')
+    if (next === state) return notify('Informe nome, projeto e data-alvo', 'error')
     setState(next)
     setDraft(null)
-    notify('Marco criado e disponível no Kanban e roadmap')
+    notify('Marco criado — vale só nesta sessão', 'info')
   }
 
   function changeStatus(milestone: Milestone, status: MilestoneStatus) {
     setState(updateMilestone(state, milestone.id, { status }))
-    notify(`Marco atualizado: ${status}`)
+    notify(`Marco atualizado: ${status} — vale só nesta sessão`, 'info')
   }
 
   function remove(milestone: Milestone) {
     setState(removeMilestone(state, milestone.id))
     setRemoving(null)
-    notify('Marco removido; tarefas preservadas')
+    notify('Marco removido — vale só nesta sessão; tarefas preservadas', 'info')
   }
 
   function link(taskId: string, milestone: Milestone) {
     const task = state.tasks.find((item) => item.id === taskId)
-    if (!task || task.project !== milestone.project) return notify('A task precisa ser do mesmo projeto do marco')
+    if (!task || task.project !== milestone.project) return notify('A task precisa ser do mesmo projeto do marco', 'error')
     if (task.milestoneIds?.includes(milestone.id)) return
-    setState(setTaskMilestones(state, taskId, [...(task.milestoneIds ?? []), milestone.id]))
+    void actions.setTaskMilestones(taskId, [...(task.milestoneIds ?? []), milestone.id])
     notify(`"${task.title}" vinculada a ${milestone.name}`)
   }
 
   function unlink(taskId: string, milestoneId: string) {
     const task = state.tasks.find((item) => item.id === taskId)
     if (!task) return
-    setState(setTaskMilestones(state, taskId, (task.milestoneIds ?? []).filter((id) => id !== milestoneId)))
+    void actions.setTaskMilestones(taskId, (task.milestoneIds ?? []).filter((id) => id !== milestoneId))
     notify(`"${task.title}" desvinculada`)
   }
 
   return <div className="milestones-page">
-    <div className="page-heading section-heading milestones-heading">
-      <div>
-        <p className="eyebrow">ENTREGAS-CHAVE</p>
-        <h1><Flag size={34} />Marcos</h1>
-        <p className="heading-subtitle">{scoped ? `Pontos-chave de ${scoped.name}. Arraste tasks da bandeja para vincular.` : 'Arraste tasks da bandeja para um marco para vincular, e de volta para desvincular.'}</p>
-      </div>
-      <button className="primary-button" onClick={() => setDraft(emptyDraft)}><Plus size={18} />Novo marco</button>
-    </div>
+    <PageHeading
+      level="section"
+      className="milestones-heading"
+      eyebrow="ENTREGAS-CHAVE"
+      title="Marcos"
+      icon={<Flag size={34} />}
+      subtitle={scoped ? `Pontos-chave de ${scoped.name}. Arraste tasks da bandeja para vincular.` : 'Arraste tasks da bandeja para um marco para vincular, e de volta para desvincular.'}
+      action={<div className="milestones-heading-actions">
+        <Badge tone="warning" icon={<CloudSlash size={13} />} title="Criar, editar e remover marco ainda não são gravados no banco. Ao recarregar, as alterações somem. Persistência prevista para a Fase 5.">Não salvo</Badge>
+        <Button variant="primary" icon={<Plus size={18} />} onClick={() => setDraft(emptyDraft)}>Novo marco</Button>
+      </div>}
+    />
 
     <section className="milestone-summary">
       <div><Flag size={20} /><span><strong>{inScope.length}</strong> marcos</span></div>
@@ -126,7 +133,7 @@ export function MilestonesView({
         onRemove={() => setRemoving(milestone)}
         onLink={(taskId) => link(taskId, milestone)}
       />)}
-      {!visible.length && <div className="view-panel milestone-empty"><Flag size={28} /><strong>Nenhum marco neste projeto</strong><span>Crie primeiro ponto-chave para acompanhar entregas.</span></div>}
+      {!visible.length && <div className="view-panel"><EmptyState icon={<Flag size={28} />} title="Nenhum marco neste projeto" description="Crie primeiro ponto-chave para acompanhar entregas." /></div>}
     </div>
 
     {draft && <Modal
@@ -136,7 +143,7 @@ export function MilestonesView({
       description="Ponto-chave mensurável do projeto. Não substitui status nem prazo."
       onClose={() => setDraft(null)}
       footer={<>
-        <button type="button" className="ghost-button" onClick={() => setDraft(null)}>Cancelar</button>
+        <Button onClick={() => setDraft(null)}>Cancelar</Button>
         <button type="submit" form="milestone-create" className="primary-button">Criar marco</button>
       </>}
     >
@@ -263,7 +270,7 @@ function MilestoneDetail({
   milestone: Milestone
   state: AppState
   setState: (state: AppState) => void
-  notify: (message: string) => void
+  notify: Notify
   onOpenTask: (task: Task) => void
   onClose: () => void
 }) {
@@ -282,10 +289,10 @@ function MilestoneDetail({
   function save(event: FormEvent) {
     event.preventDefault()
     const next = updateMilestone(state, milestone.id, draft)
-    if (next === state) return notify('Nome e data-alvo são obrigatórios')
+    if (next === state) return notify('Nome e data-alvo são obrigatórios', 'error')
     setState(next)
     setEditing(false)
-    notify('Marco editado com sucesso')
+    notify('Marco editado — vale só nesta sessão', 'info')
   }
 
   return <Modal
@@ -299,10 +306,10 @@ function MilestoneDetail({
     closeLabel="Fechar detalhes do marco"
     footer={editing
       ? <>
-        <button type="button" className="ghost-button" onClick={() => { setDraft(initial); setEditing(false) }}>Cancelar</button>
+        <Button onClick={() => { setDraft(initial); setEditing(false) }}>Cancelar</Button>
         <button type="submit" form="milestone-edit" className="primary-button">Salvar alterações</button>
       </>
-      : <button type="button" className="primary-button" onClick={() => setEditing(true)}><PencilSimple size={16} />Editar marco</button>}
+      : <Button variant="primary" icon={<PencilSimple size={16} />} onClick={() => setEditing(true)}>Editar marco</Button>}
   >
     {editing ? <form id="milestone-edit" className="ui-form" onSubmit={save}>
       <label className="ui-form-wide">Nome<input autoFocus value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} required /></label>
@@ -326,7 +333,7 @@ function MilestoneDetail({
         <header><div><strong>Tasks vinculadas</strong><span>{linked.length} participantes deste marco</span></div></header>
         {linked.length ? linked.map((task) => <button key={task.id} onClick={() => onOpenTask(task)}>
           <i style={{ background: task.color }} /><span><strong>{task.title}</strong><small>{task.module ?? 'Geral'} · {task.status}</small></span><b>{task.priority}</b>
-        </button>) : <div className="milestone-detail-empty"><Flag size={22} /><span>Nenhuma task vinculada.</span></div>}
+        </button>) : <EmptyState size="inline" icon={<Flag size={22} />} title="Nenhuma task vinculada" />}
       </section>
     </>}
   </Modal>
@@ -356,18 +363,10 @@ export function TaskMilestoneSelector({
   }
   return <div className="task-milestone-selector">
     {available.length ? available.map((milestone) => <label key={milestone.id}>
-      <input type="checkbox" checked={task.milestoneIds?.includes(milestone.id) ?? false} onChange={() => toggle(milestone.id)} />
+      <input type="checkbox" aria-label={`Marco ${milestone.name}`} checked={task.milestoneIds?.includes(milestone.id) ?? false} onChange={() => toggle(milestone.id)} />
       <i style={{ background: milestone.color }} />
       <span>{milestone.name}<small>{formatDate(milestone.targetDate)}</small></span>
     </label>) : <span>Nenhum marco disponível para este projeto.</span>}
   </div>
 }
 
-export function formatDate(value: string): string {
-  const [year, month, day] = value.split('-')
-  return year && month && day ? `${day}/${month}/${year}` : value
-}
-
-export function slug(value: string): string {
-  return value.toLocaleLowerCase().replaceAll(' ', '-').normalize('NFD').replace(/[̀-ͯ]/g, '')
-}

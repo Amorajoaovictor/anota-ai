@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   CheckCircle,
+  CloudSlash,
   FileAudio,
   FileText,
   Lightbulb,
@@ -24,12 +25,13 @@ import {
   type Priority,
 } from './domain'
 import type { ProjectActions } from './lib/store'
+import { Badge, Button, EmptyState, PageHeading, type Notify } from './ui'
 
 type ContextFlowProps = {
   state: AppState
   setState: (state: AppState) => void
   actions: ProjectActions
-  notify: (message: string) => void
+  notify: Notify
 }
 
 const kinds: EntryKind[] = [
@@ -69,14 +71,17 @@ export function SmartInboxView(props: ContextFlowProps) {
     const next = analyzeInboxItem(state, item.id)
     setState(next)
     setSelectedId(item.id)
-    notify('Contexto analisado. Revise antes de confirmar.')
+    notify('Contexto analisado — vale só nesta sessão. Revise antes de confirmar.', 'info')
   }
 
   return <div className="context-page">
     <PageHeading
+      level="section"
+      className="context-heading"
       eyebrow="ENTRADAS E CONTEXTO"
       title="Caixa de entrada inteligente"
       subtitle="Registre do seu jeito. O agente encontra projeto, módulo e próxima ação."
+      action={<Badge tone="warning" icon={<CloudSlash size={13} />} title="A caixa de entrada ainda não é gravada no banco. Ao recarregar, os itens somem. Persistência prevista para a Fase 4.">Não salvo</Badge>}
     />
 
     <section className="capture-hub view-panel">
@@ -98,9 +103,9 @@ export function SmartInboxView(props: ContextFlowProps) {
           <button className="input-mode" type="button" onClick={() => notify('Gravação de áudio entra na próxima etapa do protótipo')}><Microphone size={17} /> Gravar áudio</button>
           <button className="input-mode" type="button" onClick={() => notify('Upload de áudio entra na próxima etapa do protótipo')}><FileAudio size={17} /> Enviar arquivo</button>
         </div>
-        <button className="primary-button capture-submit" disabled={!text.trim()} onClick={captureAndAnalyze}>
-          Analisar contexto <PaperPlaneTilt size={17} weight="fill" />
-        </button>
+        <Button variant="primary" className="capture-submit" disabled={!text.trim()} onClick={captureAndAnalyze} trailing={<PaperPlaneTilt size={17} weight="fill" />}>
+          Analisar contexto
+        </Button>
       </div>
     </section>
 
@@ -133,9 +138,12 @@ export function ContextReviewQueue(props: ContextFlowProps) {
 
   return <div className="context-page">
     <PageHeading
+      level="section"
+      className="context-heading"
       eyebrow="APROVAÇÃO HUMANA"
       title="Revisão contextual"
       subtitle="Confira evidências e corrija a proposta antes de criar ou atualizar qualquer card."
+      action={<Badge tone="warning" icon={<CloudSlash size={13} />} title="A fila de revisão ainda não é gravada no banco. Ao recarregar, as propostas somem. Persistência prevista para a Fase 4.">Não salvo</Badge>}
     />
     <div className="review-overview view-panel">
       <div className="review-score"><MagicWand size={27} weight="duotone" /><div><strong>{pending.length} propostas</strong><span>aguardando decisão</span></div></div>
@@ -144,7 +152,7 @@ export function ContextReviewQueue(props: ContextFlowProps) {
     <section className="context-list review-list">
       {pending.length
         ? pending.map((item) => <InboxCard key={item.id} item={item} onOpen={() => setSelectedId(item.id)} />)
-        : <div className="empty-context"><CheckCircle size={34} weight="duotone" /><strong>Revisão em dia</strong><span>Novas classificações aparecerão aqui.</span></div>}
+        : <EmptyState icon={<CheckCircle size={34} weight="duotone" />} title="Revisão em dia" description="Novas classificações aparecerão aqui." />}
     </section>
   </div>
 }
@@ -192,17 +200,19 @@ function ContextReviewPanel({ state, setState, actions, notify, item, onBack }: 
 
   function discard() {
     setState(discardInboxItem(state, item.id))
-    notify('Entrada descartada.')
+    notify('Entrada descartada — vale só nesta sessão.', 'info')
     onBack()
   }
 
   return <div className="context-page">
     <button className="back-context" onClick={onBack}><ArrowLeft size={17} /> Voltar para fila</button>
     <PageHeading
+      level="section"
+      className="context-heading"
       eyebrow="REVISÃO CONTEXTUAL"
       title="Confirme antes de registrar"
       subtitle="A classificação é uma proposta. Ajuste qualquer campo que não represente a demanda."
-      aside={<Confidence value={draft.confidence} large />}
+      action={<Confidence value={draft.confidence} large />}
     />
 
     <div className="review-layout">
@@ -251,15 +261,8 @@ function ContextReviewPanel({ state, setState, actions, notify, item, onBack }: 
     <footer className="review-footer">
       <button className="discard-button" onClick={discard}><Trash size={17} /> Descartar entrada</button>
       <span>Será criado 1 card em <b>Backlog</b>.</span>
-      <button className="primary-button confirm-context" onClick={confirm}><CheckCircle size={18} weight="fill" /> Confirmar e criar tarefa</button>
+      <Button variant="primary" className="confirm-context" icon={<CheckCircle size={18} weight="fill" />} onClick={confirm}>Confirmar e criar tarefa</Button>
     </footer>
-  </div>
-}
-
-function PageHeading({ eyebrow, title, subtitle, aside }: { eyebrow: string; title: string; subtitle: string; aside?: ReactNode }) {
-  return <div className="page-heading context-heading">
-    <div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p className="heading-subtitle">{subtitle}</p></div>
-    {aside}
   </div>
 }
 

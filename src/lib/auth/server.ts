@@ -15,8 +15,15 @@ export function getNeonAuth() {
   return neonAuth
 }
 
-export async function requireCurrentUserId() {
+export type CurrentUser = { id: string; name: string | null; email: string | null }
+
+export async function requireCurrentUser(): Promise<CurrentUser> {
   const { data } = await getNeonAuth().getSession()
   if (!data?.user) throw new UnauthorizedError()
-  return data.user.id
+  const user = data.user
+  return { id: user.id, name: user.name ?? null, email: user.email ?? null }
+}
+
+export async function requireCurrentUserId() {
+  return (await requireCurrentUser()).id
 }

@@ -5,15 +5,17 @@ import { useMemo, useState, type CSSProperties } from 'react'
 import { dragHandleProps, useDropZone } from './dnd'
 import { getMilestoneProgress, scopeMilestones, scopeTasks, type AppState, type Milestone, type Scope, type Task } from './domain'
 import type { ProjectActions } from './lib/store'
-import { formatDate, MilestoneBadges, slug } from './milestones'
+import { formatDate, slug } from './format'
+import { MilestoneBadges } from './milestones'
 import { buildRoadmapWeek, formatRoadmapWeekRange, groupMilestonesByRoadmapDay, groupTasksByRoadmapDay, type RoadmapDayWithTasks } from './roadmap'
 import type { TaskCreateDefaults } from './taskCreate'
+import type { Notify } from './ui'
 
 type RoadmapProps = {
   state: AppState
   scope: Scope
   actions: ProjectActions
-  notify: (message: string) => void
+  notify: Notify
   onOpen: (task: Task) => void
   onCreateTask: (defaults?: TaskCreateDefaults) => void
 }

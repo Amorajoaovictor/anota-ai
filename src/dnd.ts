@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState, useSyncExternalStore, type DragEvent } from 'react'
+import { useRef, useState, useSyncExternalStore, type DragEvent, type KeyboardEvent } from 'react'
 
 export type DragItemType = 'task' | 'note' | 'plan'
 export type DragItem = { type: DragItemType; id: string; from: string }
@@ -47,6 +47,18 @@ export function dragHandleProps(item: DragItem) {
     },
     onDragEnd() {
       endDrag()
+    },
+  }
+}
+
+/** Alt+↑/↓ reordena sem mouse. Complementa `dragHandleProps` no mesmo elemento. */
+export function reorderKeyProps(onMove: (direction: -1 | 1) => void): { tabIndex: 0; onKeyDown: (event: KeyboardEvent<HTMLElement>) => void } {
+  return {
+    tabIndex: 0,
+    onKeyDown(event) {
+      if (!event.altKey) return
+      if (event.key === 'ArrowUp') { event.preventDefault(); onMove(-1) }
+      if (event.key === 'ArrowDown') { event.preventDefault(); onMove(1) }
     },
   }
 }

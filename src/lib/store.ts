@@ -34,6 +34,7 @@ import {
   type TaskStatus,
 } from '../domain'
 import { ApiError, deleteJson, getJson, patchJson, postJson } from './api'
+import type { Notify } from '../ui'
 import {
   toContextCreateBody,
   toContextPatchBody,
@@ -79,7 +80,7 @@ type Mutation<Result> = {
  * ordem do plano do dia continuam em memória e usam `setState` direto; criar e
  * editar marco também, porque é Fase 5.
  */
-export function useProjectData(initial: AppState, notify: (message: string) => void) {
+export function useProjectData(initial: AppState, notify: Notify) {
   const [state, setStateValue] = useState(initial)
   const stateRef = useRef(state)
   const notifyRef = useRef(notify)
@@ -97,7 +98,7 @@ export function useProjectData(initial: AppState, notify: (message: string) => v
     const before = stateRef.current
     const after = mutation.apply(before)
     if (after === before) {
-      notifyRef.current(mutation.invalid ?? 'Operação inválida')
+      notifyRef.current(mutation.invalid ?? 'Operação inválida', 'error')
       return
     }
     commit(after)
@@ -109,7 +110,7 @@ export function useProjectData(initial: AppState, notify: (message: string) => v
     } catch (error) {
       // Volta ao estado anterior inteiro: sem isso a tela mostraria algo que o banco não tem.
       commit(before)
-      notifyRef.current(error instanceof ApiError ? error.detail : 'Falha ao salvar')
+      notifyRef.current(error instanceof ApiError ? error.detail : 'Falha ao salvar', 'error')
     }
   }, [commit])
 

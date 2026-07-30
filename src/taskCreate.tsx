@@ -4,7 +4,7 @@ import { MagicWand } from '@phosphor-icons/react'
 import { useState } from 'react'
 import { entryKinds, priorities, projectTags, scopeMilestones, scopeProject, scopeProjects, suggestTaskFields, taskStatuses, type AppState, type EntryKind, type Priority, type Scope, type TaskStatus } from './domain'
 import { TaskMilestoneSelector } from './milestones'
-import { Modal } from './ui'
+import { Button, Modal } from './ui'
 
 /**
  * Pré-preenchimento vindo da tela que abriu a criação: coluna do Kanban define
@@ -99,9 +99,9 @@ export function TaskCreateDialog({ state, scope, defaults, onClose, onCreate }: 
     description="Só título e projeto são obrigatórios. O resto pode ser sugerido pela IA ou ajustado depois."
     onClose={onClose}
     footer={<>
-      <button className="ghost-button ui-suggest" disabled={!ready} onClick={suggest}><MagicWand size={17} />Sugerir com IA</button>
-      <button className="ghost-button" onClick={onClose}>Cancelar</button>
-      <button className="primary-button" disabled={!ready} onClick={() => onCreate(draft)}>Criar tarefa</button>
+      <Button className="ui-suggest" icon={<MagicWand size={17} />} disabled={!ready} onClick={suggest}>Sugerir com IA</Button>
+      <Button onClick={onClose}>Cancelar</Button>
+      <Button variant="primary" disabled={!ready} onClick={() => onCreate(draft)}>Criar tarefa</Button>
     </>}
   >
     <div className="ui-form">
@@ -135,7 +135,7 @@ export function TaskCreateDialog({ state, scope, defaults, onClose, onCreate }: 
           className={`tag-option ${draft.tagIds.includes(tag.id) ? 'active' : ''}`}
           style={{ '--tag-color': tag.color } as React.CSSProperties}
         >
-          <input type="checkbox" checked={draft.tagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} />
+          <input type="checkbox" aria-label={`Etiqueta ${tag.name}`} checked={draft.tagIds.includes(tag.id)} onChange={() => toggleTag(tag.id)} />
           <i />
           <span>{tag.name}</span>
         </label>)}</div>

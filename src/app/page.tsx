@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation'
 import App from '../App'
-import { requireCurrentUserId } from '../lib/auth/server'
+import { requireCurrentUser } from '../lib/auth/server'
 import { toAppState, type DbContext, type DbMilestone, type DbNote, type DbProject, type DbTask } from '../lib/mapping'
 import { getPrisma } from '../lib/prisma'
 import { listContexts } from '../server/contexts'
@@ -17,13 +17,14 @@ export const dynamic = 'force-dynamic'
  * vazio esperando um fetch do cliente. As escritas seguem pela API.
  */
 export default async function HomePage() {
-  let ownerId: string
+  let user: Awaited<ReturnType<typeof requireCurrentUser>>
   try {
-    ownerId = await requireCurrentUserId()
+    user = await requireCurrentUser()
   } catch (error) {
     if (error instanceof UnauthorizedError) redirect('/auth/sign-in')
     throw error
   }
+  const ownerId = user.id
 
   const prisma = getPrisma()
   const [projects, tasks, milestones, notes, contexts] = await Promise.all([
@@ -34,11 +35,14 @@ export default async function HomePage() {
     listContexts(prisma, ownerId),
   ])
 
-  return <App initialState={toAppState(
-    projects as DbProject[],
-    tasks as DbTask[],
-    milestones as DbMilestone[],
-    notes as DbNote[],
-    contexts as DbContext[],
-  )} />
+  return <App
+    initialState={toAppState(
+      projects as DbProject[],
+      tasks as DbTask[],
+      milestones as DbMilestone[],
+      notes as DbNote[],
+      contexts as DbContext[],
+    )}
+    user={user}
+  />
 }

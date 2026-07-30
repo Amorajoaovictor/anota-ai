@@ -2,16 +2,16 @@
 
 import { DotsSixVertical, Kanban, LockKey, MagnifyingGlass, NotePencil, Plus, PushPin, X } from '@phosphor-icons/react'
 import { useMemo, useState } from 'react'
-import { dragHandleProps, useDropZone, type DragItem } from './dnd'
+import { dragHandleProps, reorderKeyProps, useDropZone, type DragItem } from './dnd'
 import { filterNotes, scopeNotes, scopeProject, scopeProjects, scopeTasks, type AppState, type Note, type Scope, type Task } from './domain'
 import type { ProjectActions } from './lib/store'
-import { Modal } from './ui'
+import { Button, EmptyState, Modal, PageHeading, type Notify } from './ui'
 
 type NotesViewProps = {
   state: AppState
   scope: Scope
   actions: ProjectActions
-  notify: (message: string) => void
+  notify: Notify
 }
 
 export function NotesView({ state, scope, actions, notify }: NotesViewProps) {
@@ -70,10 +70,15 @@ export function NotesView({ state, scope, actions, notify }: NotesViewProps) {
   }
 
   return <div className="notes-page">
-    <div className="page-heading section-heading keep-heading">
-      <div><p className="eyebrow">ESPAÇO PESSOAL</p><h1><NotePencil size={34} />Notas</h1>{scoped && <p className="heading-subtitle">Notas privadas de {scoped.name}.</p>}</div>
-      <div className="keep-privacy"><LockKey size={16} /><span>Privadas · fora de IA e MCP</span></div>
-    </div>
+    <PageHeading
+      level="section"
+      className="keep-heading"
+      eyebrow="ESPAÇO PESSOAL"
+      title="Notas"
+      icon={<NotePencil size={34} />}
+      subtitle={scoped ? `Notas privadas de ${scoped.name}.` : undefined}
+      action={<div className="keep-privacy"><LockKey size={16} /><span>Privadas · fora de IA e MCP</span></div>}
+    />
 
     <div className="keep-workspace">
       <label className="notes-search">
@@ -94,12 +99,12 @@ export function NotesView({ state, scope, actions, notify }: NotesViewProps) {
             <option value="">Sem card relacionado</option>
             {composerTasks.map((task) => <option key={task.id} value={task.id}>{task.title}</option>)}
           </select>}
-          <footer><span><LockKey size={14} />Nota privada</span><div><button className="keep-close" onClick={() => { setComposerOpen(false); setTitle(''); setContent(''); setComposerProject(''); setComposerTask('') }}>Fechar</button><button className="primary-button" disabled={!content.trim() || !targetProjectId} onClick={saveNote}><Plus size={16} />Salvar</button></div></footer>
+          <footer><span><LockKey size={14} />Nota privada</span><div><button className="keep-close" onClick={() => { setComposerOpen(false); setTitle(''); setContent(''); setComposerProject(''); setComposerTask('') }}>Fechar</button><Button variant="primary" icon={<Plus size={16} />} disabled={!content.trim() || !targetProjectId} onClick={saveNote}>Salvar</Button></div></footer>
         </section>
         : <button className="keep-composer collapsed" onClick={() => setComposerOpen(true)}><span>Criar uma nota...</span><NotePencil size={20} /></button>}
 
       {visibleNotes.length === 0
-        ? <div className="keep-empty"><NotePencil size={38} /><strong>{query ? 'Nenhuma nota encontrada' : 'Suas notas aparecem aqui'}</strong><span>{query ? 'Tente pesquisar outro termo.' : 'Crie primeira nota usando campo acima.'}</span></div>
+        ? <EmptyState icon={<NotePencil size={38} />} title={query ? 'Nenhuma nota encontrada' : 'Suas notas aparecem aqui'} description={query ? 'Tente pesquisar outro termo.' : 'Crie primeira nota usando campo acima.'} />
         : <div className="notes-board">
           <NotesSection title="Fixadas" pinned notes={pinnedNotes} projectNameOf={projectNameOf} taskOf={taskOf} onDrop={drop} onEdit={setEditingNote} onPin={pin} onConvert={setConvertingNote} />
           <NotesSection title={pinnedNotes.length > 0 ? 'Outras' : 'Notas'} pinned={false} notes={otherNotes} projectNameOf={projectNameOf} taskOf={taskOf} onDrop={drop} onEdit={setEditingNote} onPin={pin} onConvert={setConvertingNote} />
@@ -133,22 +138,33 @@ function NotesSection({ title, pinned, notes, projectNameOf, taskOf, onDrop, onE
   const zone = useDropZone((item) => item.type === 'note', (item) => onDrop(item, pinned))
   if (!notes.length && !zone.active) return null
 
+  function moveByKeyboard(noteId: string, direction: -1 | 1) {
+    const index = notes.findIndex((note) => note.id === noteId)
+    if (index < 0) return
+    if (direction === -1 && index === 0) return
+    if (direction === 1 && index === notes.length - 1) return
+    const beforeId = direction === -1 ? notes[index - 1]?.id : notes[index + 2]?.id
+    onDrop({ type: 'note', id: noteId, from: pinned ? 'pinned' : 'others' }, pinned, beforeId)
+  }
+
   return <section className={`keep-section ${zone.active ? 'drop-active' : ''} ${zone.over ? 'drop-over' : ''}`} {...zone.dropProps}>
     <h2>{title}{pinned && <PushPin size={11} weight="fill" />}</h2>
     <div className="keep-grid">
-      {notes.map((note) => <NoteCard key={note.id} note={note} projectName={projectNameOf(note)} task={taskOf(note)} onDrop={onDrop} onEdit={onEdit} onPin={onPin} onConvert={onConvert} />)}
+      {notes.map((note) => <NoteCard key={note.id} note={note} projectName={projectNameOf(note)} task={taskOf(note)} onDrop={onDrop} onMove={(direction) => moveByKeyboard(note.id, direction)} onEdit={onEdit} onPin={onPin} onConvert={onConvert} />)}
     </div>
     {!notes.length && <p className="keep-section-hint">Soltar aqui para {pinned ? 'fixar' : 'desafixar'}</p>}
   </section>
 }
 
-function NoteCard({ note, projectName, task, onDrop, onEdit, onPin, onConvert }: { note: Note; projectName?: string; task?: Task } & Pick<SectionProps, 'onDrop' | 'onEdit' | 'onPin' | 'onConvert'>) {
+function NoteCard({ note, projectName, task, onDrop, onMove, onEdit, onPin, onConvert }: { note: Note; projectName?: string; task?: Task; onMove: (direction: -1 | 1) => void } & Pick<SectionProps, 'onDrop' | 'onEdit' | 'onPin' | 'onConvert'>) {
   const zone = useDropZone((item) => item.type === 'note' && item.id !== note.id, (item) => onDrop(item, note.pinned, note.id))
 
   return <article
     className={`keep-card ${zone.over ? 'drop-before' : ''}`}
     onClick={(event) => { if (!(event.target as HTMLElement).closest('button')) onEdit(note) }}
     {...dragHandleProps({ type: 'note', id: note.id, from: note.pinned ? 'pinned' : 'others' })}
+    {...reorderKeyProps(onMove)}
+    aria-label={`${note.title}. Alt seta para cima ou para baixo reordena.`}
     {...zone.dropProps}
   >
     <DotsSixVertical className="drag-grip keep-grip" size={15} />
@@ -181,8 +197,8 @@ function NoteEditDialog({ note, tasks, onClose, onSave }: { note: Note; tasks: T
     closeLabel="Fechar edição"
     footer={<>
       <span className="ui-modal-hint">{content.trim().length} caracteres</span>
-      <button className="ghost-button" onClick={onClose}>Cancelar</button>
-      <button className="primary-button" disabled={!content.trim()} onClick={() => onSave(title, content, taskId)}>Salvar alterações</button>
+      <Button onClick={onClose}>Cancelar</Button>
+      <Button variant="primary" disabled={!content.trim()} onClick={() => onSave(title, content, taskId)}>Salvar alterações</Button>
     </>}
   >
     <div className="note-dialog-fields">
@@ -207,8 +223,8 @@ function NoteConvertDialog({ note, state, onClose, onConfirm }: { note: Note; st
     description="A nota continua privada. Um card é criado no Backlog do projeto escolhido."
     onClose={onClose}
     footer={<>
-      <button className="ghost-button" onClick={onClose}>Cancelar</button>
-      <button className="primary-button" disabled={!project} onClick={() => onConfirm(project)}>Criar card</button>
+      <Button onClick={onClose}>Cancelar</Button>
+      <Button variant="primary" disabled={!project} onClick={() => onConfirm(project)}>Criar card</Button>
     </>}
   >
     <div className="ui-form">

@@ -814,6 +814,68 @@ export function taskDependencies(tasks: Task[], task: Task): Task[] {
     .filter((item): item is Task => Boolean(item))
 }
 
+export type SearchHit =
+  | { kind: 'project'; id: string; title: string; subtitle: string; color: string; projectId: string }
+  | { kind: 'task'; id: string; title: string; subtitle: string; color: string; projectId: string }
+  | { kind: 'note'; id: string; title: string; subtitle: string; projectId: string }
+  | { kind: 'milestone'; id: string; title: string; subtitle: string; color: string; projectId: string }
+  | { kind: 'context'; id: string; title: string; subtitle: string; projectId: string }
+
+/**
+ * Busca do command palette. Reaproveita `filterTasks`/`filterNotes`; projeto, marco e
+ * contexto ganham casadores curtos porque não existiam antes. Ordem: prefixo exato,
+ * depois substring, depois projeto → tarefa → marco → nota → contexto.
+ */
+export function searchAll(state: AppState, query: string, limitPerGroup = 5): SearchHit[] {
+  const normalized = query.trim().toLocaleLowerCase()
+  if (!normalized) return []
+
+  const projectById = new Map(state.projects.map((project) => [project.id, project]))
+  const rank = (text: string) => text.toLocaleLowerCase().startsWith(normalized) ? 0 : 1
+  const byRank = <T,>(items: T[], text: (item: T) => string) =>
+    [...items].sort((left, right) => rank(text(left)) - rank(text(right)))
+
+  const projects: SearchHit[] = byRank(
+    state.projects.filter((project) =>
+      `${project.name} ${project.aliases.join(' ')} ${project.modules.join(' ')}`.toLocaleLowerCase().includes(normalized)),
+    (project) => project.name,
+  ).slice(0, limitPerGroup).map((project) => ({
+    kind: 'project', id: project.id, title: project.name,
+    subtitle: project.aliases.length ? `alias ${project.aliases.join(', ')}` : `${project.modules.length} módulos`,
+    color: project.color, projectId: project.id,
+  }))
+
+  const tasks: SearchHit[] = byRank(filterTasks(state.tasks, { query: normalized }), (task) => task.title)
+    .slice(0, limitPerGroup).map((task) => ({
+      kind: 'task', id: task.id, title: task.title, subtitle: `${task.project} · ${task.status}`,
+      color: task.color, projectId: projectById.get(task.project)?.id ?? '',
+    }))
+
+  const milestones: SearchHit[] = byRank(
+    state.milestones.filter((milestone) => `${milestone.name} ${milestone.project}`.toLocaleLowerCase().includes(normalized)),
+    (milestone) => milestone.name,
+  ).slice(0, limitPerGroup).map((milestone) => ({
+    kind: 'milestone', id: milestone.id, title: milestone.name, subtitle: milestone.project,
+    color: milestone.color, projectId: state.projects.find((project) => project.name === milestone.project)?.id ?? '',
+  }))
+
+  const notes: SearchHit[] = byRank(filterNotes(state.notes, normalized), (note) => note.title)
+    .slice(0, limitPerGroup).map((note) => ({
+      kind: 'note', id: note.id, title: note.title || 'Sem título',
+      subtitle: projectById.get(note.projectId)?.name ?? '', projectId: note.projectId,
+    }))
+
+  const contexts: SearchHit[] = byRank(
+    state.contexts.filter((context) => `${context.title} ${context.content}`.toLocaleLowerCase().includes(normalized)),
+    (context) => context.title,
+  ).slice(0, limitPerGroup).map((context) => ({
+    kind: 'context', id: context.id, title: context.title,
+    subtitle: projectById.get(context.projectId)?.name ?? '', projectId: context.projectId,
+  }))
+
+  return [...projects, ...tasks, ...milestones, ...notes, ...contexts]
+}
+
 export function filterTasksByMilestone(tasks: Task[], milestoneId: MilestoneFilter): Task[] {
   if (!milestoneId) return tasks
   if (milestoneId === 'unassigned') return tasks.filter((task) => !task.milestoneIds?.length)
@@ -945,6 +1007,23 @@ function reorder<T extends { id: string }>(items: T[], draggedId: string, before
 export function reorderActionPlan(state: AppState, draggedId: string, beforeId?: string): AppState {
   const actionPlan = reorder(state.actionPlan, draggedId, beforeId)
   return actionPlan ? { ...state, actionPlan } : state
+}
+
+/** DD/MM vira MM-DD para comparar sem depender do ano corrente. Sem prazo vai para o fim. */
+function dueSortKey(due?: string): string {
+  if (!due) return '99-99'
+  const [day, month] = due.split('/')
+  return `${month}-${day}`
+}
+
+/** Ordena o plano por prioridade (P0→P3) e, dentro dela, por prazo mais próximo. Ordem vale só nesta sessão. */
+export function sortActionPlanByPriority(state: AppState): AppState {
+  const actionPlan = [...state.actionPlan].sort((left, right) => {
+    const priorityDiff = priorities.indexOf(left.priority) - priorities.indexOf(right.priority)
+    if (priorityDiff !== 0) return priorityDiff
+    return dueSortKey(left.due).localeCompare(dueSortKey(right.due))
+  })
+  return { ...state, actionPlan }
 }
 
 /**
