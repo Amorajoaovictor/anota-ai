@@ -1,12 +1,13 @@
 import { z } from 'zod'
 
 const statusSchema = z.enum(['BACKLOG', 'IN_PROGRESS', 'BLOCKED', 'IN_REVIEW', 'COMPLETED', 'CANCELED'])
-const kindSchema = z.enum(['TASK', 'BUG', 'IMPROVEMENT', 'FEATURE', 'DECISION', 'EXTERNAL_REQUEST', 'FUTURE_IDEA', 'QUESTION'])
-const prioritySchema = z.enum(['P0', 'P1', 'P2', 'P3'])
-const complexitySchema = z.number().int().min(1).max(3).nullable()
-const dueSchema = z.string().datetime().nullable()
+/** Exportados porque `inbox.ts` monta o mesmo formato ao confirmar uma proposta da Revisão IA. */
+export const kindSchema = z.enum(['TASK', 'BUG', 'IMPROVEMENT', 'FEATURE', 'DECISION', 'EXTERNAL_REQUEST', 'FUTURE_IDEA', 'QUESTION'])
+export const prioritySchema = z.enum(['P0', 'P1', 'P2', 'P3'])
+export const complexitySchema = z.number().int().min(1).max(3).nullable()
+export const dueSchema = z.string().datetime().nullable()
 /** Texto livre: a tela cria módulo enquanto digita, sem cadastro prévio. */
-const moduleNameSchema = z.string().trim().max(80)
+export const moduleNameSchema = z.string().trim().max(80)
 const idList = z.array(z.string().trim().min(1)).max(50)
 
 export const taskInputSchema = z.object({
@@ -24,6 +25,8 @@ export const taskInputSchema = z.object({
   tagIds: idList.optional(),
   /** Nota de origem, quando o card nasce de "Converter em card". */
   sourceNoteId: z.string().trim().min(1).nullable().optional(),
+  /** Entrada da caixa que originou o card, quando confirmado pela Revisão IA. */
+  sourceInboxId: z.string().trim().min(1).nullable().optional(),
 }).strict()
 
 export const taskPatchSchema = z.object({
@@ -62,9 +65,10 @@ type TaskLinkRepository = {
   projectTag: { findMany(args: any): Promise<{ id: string }[]> }
 }
 
-type TaskCreateRepository = TaskLinkRepository & {
+export type TaskCreateRepository = TaskLinkRepository & {
   project: { findFirst(args: any): Promise<{ id: string } | null> }
   note: { findFirst(args: any): Promise<{ id: string } | null> }
+  inboxItem: { findFirst(args: any): Promise<{ id: string } | null> }
   task: { create(args: any): Promise<unknown> }
 }
 
@@ -110,14 +114,18 @@ export async function createTask(
   })
   if (!project) return { kind: 'project-not-found' }
 
-  const { projectId, moduleName, milestoneIds, tagIds, sourceNoteId, ...fields } = parsed.data
-  const [milestones, tags, sourceNote] = await Promise.all([
+  const { projectId, moduleName, milestoneIds, tagIds, sourceNoteId, sourceInboxId, ...fields } = parsed.data
+  const [milestones, tags, sourceNote, sourceInbox] = await Promise.all([
     ownedLinkIds((args) => repository.milestone.findMany(args), project.id, milestoneIds),
     ownedLinkIds((args) => repository.projectTag.findMany(args), project.id, tagIds),
     // Nota de outro dono, inexistente ou já convertida não vira origem: `sourceNoteId`
     // é único, e insistir derrubaria a criação por conflito.
     sourceNoteId
       ? repository.note.findFirst({ where: { id: sourceNoteId, ownerId, convertedTask: { is: null } }, select: { id: true } })
+      : Promise.resolve(null),
+    // Mesma regra da nota: entrada de outro dono, inexistente ou já confirmada não vira origem.
+    sourceInboxId
+      ? repository.inboxItem.findFirst({ where: { id: sourceInboxId, ownerId, createdTask: { is: null } }, select: { id: true } })
       : Promise.resolve(null),
   ])
 
@@ -135,6 +143,7 @@ export async function createTask(
       ...(milestones.length ? { milestones: { create: milestones.map((id) => ({ milestoneId: id })) } } : {}),
       ...(tags.length ? { tags: { create: tags.map((id) => ({ tagId: id })) } } : {}),
       ...(sourceNote ? { sourceNote: { connect: { id: sourceNote.id } } } : {}),
+      ...(sourceInbox ? { source: { connect: { id: sourceInbox.id } } } : {}),
     },
     include: taskInclude,
   })

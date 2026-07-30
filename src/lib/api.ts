@@ -44,6 +44,11 @@ export function postJson<Result>(url: string, body: unknown) {
   })
 }
 
+/** Sem header de content-type: o browser define o boundary do multipart sozinho. */
+export function postForm<Result>(url: string, form: FormData) {
+  return send<Result>(url, { method: 'POST', body: form })
+}
+
 export function patchJson<Result>(url: string, body: unknown) {
   return send<Result>(url, {
     method: 'PATCH',

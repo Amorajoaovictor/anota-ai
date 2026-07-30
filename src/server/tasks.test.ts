@@ -9,11 +9,17 @@ const include = {
   dependsOn: true,
 }
 
-/** Marco, etiqueta e nota de origem são consultados antes de gravar o vínculo. */
-const links = (milestones: { id: string }[] = [], tags: { id: string }[] = [], note: { id: string } | null = null) => ({
+/** Marco, etiqueta, nota de origem e entrada de origem são consultados antes de gravar o vínculo. */
+const links = (
+  milestones: { id: string }[] = [],
+  tags: { id: string }[] = [],
+  note: { id: string } | null = null,
+  inbox: { id: string } | null = null,
+) => ({
   milestone: { findMany: vi.fn().mockResolvedValue(milestones) },
   projectTag: { findMany: vi.fn().mockResolvedValue(tags) },
   note: { findFirst: vi.fn().mockResolvedValue(note) },
+  inboxItem: { findFirst: vi.fn().mockResolvedValue(inbox) },
 })
 
 describe('cards persistidos', () => {
@@ -193,6 +199,31 @@ describe('cards persistidos', () => {
 
     expect(result.kind).toBe('created')
     expect(create.mock.calls[0]![0].data.sourceNote).toBeUndefined()
+  })
+
+  it('conecta a entrada de origem só quando ela é do dono e ainda não virou card', async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: 'project-1' })
+    const create = vi.fn().mockResolvedValue({ id: 'task-1' })
+    const repo = { ...links([], [], null, { id: 'inbox-1' }), project: { findFirst }, task: { create } }
+
+    await createTask(repo, 'user-1', { projectId: 'project-1', title: 'Da revisão IA', sourceInboxId: 'inbox-1' })
+
+    expect(repo.inboxItem.findFirst).toHaveBeenCalledWith({
+      where: { id: 'inbox-1', ownerId: 'user-1', createdTask: { is: null } },
+      select: { id: true },
+    })
+    expect(create.mock.calls[0]![0].data.source).toEqual({ connect: { id: 'inbox-1' } })
+  })
+
+  it('ignora entrada de origem já confirmada em vez de estourar o índice único', async () => {
+    const findFirst = vi.fn().mockResolvedValue({ id: 'project-1' })
+    const create = vi.fn().mockResolvedValue({ id: 'task-1' })
+    const repo = { ...links(), project: { findFirst }, task: { create } }
+
+    const result = await createTask(repo, 'user-1', { projectId: 'project-1', title: 'Da revisão IA', sourceInboxId: 'inbox-1' })
+
+    expect(result.kind).toBe('created')
+    expect(create.mock.calls[0]![0].data.source).toBeUndefined()
   })
 })
 

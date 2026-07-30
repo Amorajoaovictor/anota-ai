@@ -151,6 +151,10 @@
 .confidence.large strong { font-size: 17px; }
 .confidence.large > div { grid-column: 1 / -1; height: 4px; background: #283632; border-radius: 3px; overflow: hidden; }
 .confidence.large i { display: block; height: 100%; background: var(--green); }
+.confidence.tone-warning strong { color: var(--amber); }
+.confidence.tone-danger strong { color: var(--danger); }
+.confidence.large.tone-warning i { background: var(--amber); }
+.confidence.large.tone-danger i { background: var(--danger); }
 .review-button { display: inline-flex; gap: 8px; align-items: center; border: 1px solid #35463f; border-radius: 5px; background: #16241f; color: var(--green); padding: 9px 11px; font-size: 11px; }
 .review-button:hover { border-color: var(--green); }
 .review-button:disabled { cursor: default; border-color: #2f3c38; background: #151f1b; color: #7c9990; }

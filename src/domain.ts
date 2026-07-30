@@ -15,12 +15,16 @@ export type ContextSuggestion = {
   module: string
   kind: EntryKind
   priority: Priority
+  complexity: Complexity
   confidence: number
   evidence: string[]
   duplicates: string[]
   action: string
   due?: string
+  forecast?: string
   responsible?: string
+  /** Tags que ainda não existem no projeto e podem ser criadas junto da confirmação. */
+  newTags?: string[]
 }
 
 /** Etiqueta do card. Pertence a um projeto: o vocabulário de um não vale no outro. */
@@ -114,6 +118,13 @@ export type InboxItem = {
   date: string
   suggestion?: ContextSuggestion
 }
+/**
+ * Status em que o item ainda depende de um job rodar (`ai.classify`/`audio.transcribe`).
+ * Só esses valem a pena reconsultar por polling — a partir de "Aguardando confirmação"
+ * nada muda sozinho no servidor, só por ação do usuário.
+ */
+export const pendingInboxStatuses: InboxStatus[] = ['Recebida', 'Transcrevendo', 'Analisando contexto']
+
 export const taskStatuses: TaskStatus[] = ['Backlog', 'Em andamento', 'Bloqueada', 'Em validação', 'Concluída', 'Cancelada']
 export const priorities: Priority[] = ['P0', 'P1', 'P2', 'P3']
 export const entryKinds: EntryKind[] = ['Tarefa', 'Bug', 'Melhoria', 'Funcionalidade', 'Decisão', 'Solicitação externa', 'Ideia futura', 'Pergunta']
@@ -475,7 +486,7 @@ export function toDayMonth(date: Date): string {
 }
 
 /** Bug urgente é raramente barato; ideia futura raramente é caro. Heurística, não verdade. */
-function suggestComplexity(kind: EntryKind, priority: Priority): Complexity {
+export function suggestComplexity(kind: EntryKind, priority: Priority): Complexity {
   if (kind === 'Funcionalidade' || priority === 'P0') return 'Alta'
   if (kind === 'Ideia futura' || kind === 'Pergunta' || priority === 'P3') return 'Baixa'
   return 'Média'
@@ -1065,6 +1076,8 @@ function buildContextSuggestion(text: string): ContextSuggestion {
   const isIntranet = ['intranet', 'permissão', 'permissoes', 'acesso'].some((term) => normalized.includes(term))
 
   if (isVistaFor) {
+    const kind: EntryKind = normalized.includes('trav') ? 'Bug' : 'Melhoria'
+    const priority: Priority = normalized.includes('prioridade alta') ? 'P1' : 'P2'
     return {
       title: normalized.includes('planta')
         ? 'Corrigir carregamento automático da planta principal'
@@ -1072,8 +1085,9 @@ function buildContextSuggestion(text: string): ContextSuggestion {
       summary: 'Falha no carregamento inicial do mapa prejudica navegação e desempenho.',
       project: 'VistaFor',
       module: 'Loteamentos / Mapa',
-      kind: normalized.includes('trav') ? 'Bug' : 'Melhoria',
-      priority: normalized.includes('prioridade alta') ? 'P1' : 'P2',
+      kind,
+      priority,
+      complexity: suggestComplexity(kind, priority),
       confidence: 93,
       evidence: [
         'Texto menciona planta ou mapa.',
@@ -1093,6 +1107,7 @@ function buildContextSuggestion(text: string): ContextSuggestion {
       module: 'Acessos',
       kind: 'Tarefa',
       priority: 'P2',
+      complexity: suggestComplexity('Tarefa', 'P2'),
       confidence: 88,
       evidence: ['Texto menciona acesso ou permissão.', 'Termos coincidem com módulo Acessos da Intranet.'],
       duplicates: ['Validar regra de permissões'],
@@ -1107,6 +1122,7 @@ function buildContextSuggestion(text: string): ContextSuggestion {
     module: 'Geral',
     kind: 'Tarefa',
     priority: 'P3',
+    complexity: suggestComplexity('Tarefa', 'P3'),
     confidence: 64,
     evidence: ['Não há projeto explícito no texto.', 'Classificação usa contexto recente como hipótese.'],
     duplicates: [],

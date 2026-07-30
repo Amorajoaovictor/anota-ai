@@ -1,7 +1,6 @@
 import {
   ArrowLeft,
   CheckCircle,
-  CloudSlash,
   FileAudio,
   FileText,
   Lightbulb,
@@ -12,20 +11,19 @@ import {
   Trash,
   WarningCircle,
 } from '@phosphor-icons/react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
-  addInboxItem,
-  analyzeInboxItem,
-  discardInboxItem,
-  updateInboxSuggestion,
+  complexities,
+  pendingInboxStatuses,
   type AppState,
+  type Complexity,
   type ContextSuggestion,
   type EntryKind,
   type InboxItem,
   type Priority,
 } from './domain'
 import type { ProjectActions } from './lib/store'
-import { Badge, Button, EmptyState, PageHeading, type Notify } from './ui'
+import { Button, EmptyState, PageHeading, type BadgeTone, type Notify } from './ui'
 
 type ContextFlowProps = {
   state: AppState
@@ -46,10 +44,53 @@ const kinds: EntryKind[] = [
 ]
 const priorities: Priority[] = ['P0', 'P1', 'P2', 'P3']
 
+/** Enquanto houver item em processamento, busca o resultado do job a cada 2s. Para sozinho quando não sobra nenhum. */
+function useInboxPolling(state: AppState, actions: ProjectActions) {
+  useEffect(() => {
+    const hasPending = state.inbox.some((item) => pendingInboxStatuses.includes(item.status))
+    if (!hasPending) return
+    const timer = setInterval(() => { void actions.refreshInbox() }, 2000)
+    return () => clearInterval(timer)
+  }, [state.inbox, actions])
+}
+
+/** Grava com `MediaRecorder` nativo do browser — sem dependência nova. */
+function useAudioRecorder(onStop: (blob: Blob) => void) {
+  const [recording, setRecording] = useState(false)
+  const recorderRef = useRef<MediaRecorder | null>(null)
+  const chunksRef = useRef<Blob[]>([])
+
+  async function start() {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+    const recorder = new MediaRecorder(stream)
+    chunksRef.current = []
+    recorder.ondataavailable = (event) => { if (event.data.size > 0) chunksRef.current.push(event.data) }
+    recorder.onstop = () => {
+      stream.getTracks().forEach((track) => track.stop())
+      onStop(new Blob(chunksRef.current, { type: recorder.mimeType || 'audio/webm' }))
+    }
+    recorder.start()
+    recorderRef.current = recorder
+    setRecording(true)
+  }
+
+  function stop() {
+    recorderRef.current?.stop()
+    recorderRef.current = null
+    setRecording(false)
+  }
+
+  return { recording, start, stop }
+}
+
 export function SmartInboxView(props: ContextFlowProps) {
-  const { state, setState, notify } = props
+  const { state, actions, notify } = props
   const [text, setText] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const recorder = useAudioRecorder((blob) => { void actions.captureInboxAudio(blob) })
+  useInboxPolling(state, actions)
+
   const selected = state.inbox.find((item) => item.id === selectedId)
   const active = state.inbox.filter((item) => item.status !== 'Descartada')
 
@@ -58,20 +99,21 @@ export function SmartInboxView(props: ContextFlowProps) {
   }
 
   function captureAndAnalyze() {
-    const captured = addInboxItem(state, text)
-    if (captured === state) return
-    const item = captured.inbox[0]
-    const analyzed = analyzeInboxItem(captured, item.id)
-    setState(analyzed)
+    const clean = text.trim()
+    if (!clean) return
+    void actions.captureInbox(clean)
     setText('')
-    setSelectedId(item.id)
   }
 
-  function analyze(item: InboxItem) {
-    const next = analyzeInboxItem(state, item.id)
-    setState(next)
-    setSelectedId(item.id)
-    notify('Contexto analisado — vale só nesta sessão. Revise antes de confirmar.', 'info')
+  function toggleRecording() {
+    if (recorder.recording) { recorder.stop(); return }
+    recorder.start().catch(() => notify('Não foi possível acessar o microfone.', 'error'))
+  }
+
+  function pickFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (file) void actions.captureInboxAudio(file)
+    event.target.value = ''
   }
 
   return <div className="context-page">
@@ -81,7 +123,6 @@ export function SmartInboxView(props: ContextFlowProps) {
       eyebrow="ENTRADAS E CONTEXTO"
       title="Caixa de entrada inteligente"
       subtitle="Registre do seu jeito. O agente encontra projeto, módulo e próxima ação."
-      action={<Badge tone="warning" icon={<CloudSlash size={13} />} title="A caixa de entrada ainda não é gravada no banco. Ao recarregar, os itens somem. Persistência prevista para a Fase 4.">Não salvo</Badge>}
     />
 
     <section className="capture-hub view-panel">
@@ -100,8 +141,11 @@ export function SmartInboxView(props: ContextFlowProps) {
       <div className="capture-actions">
         <div>
           <button className="input-mode active" type="button"><FileText size={17} /> Texto</button>
-          <button className="input-mode" type="button" onClick={() => notify('Gravação de áudio entra na próxima etapa do protótipo')}><Microphone size={17} /> Gravar áudio</button>
-          <button className="input-mode" type="button" onClick={() => notify('Upload de áudio entra na próxima etapa do protótipo')}><FileAudio size={17} /> Enviar arquivo</button>
+          <button className={`input-mode ${recorder.recording ? 'active' : ''}`} type="button" onClick={toggleRecording}>
+            <Microphone size={17} weight={recorder.recording ? 'fill' : 'regular'} /> {recorder.recording ? 'Parar gravação' : 'Gravar áudio'}
+          </button>
+          <button className="input-mode" type="button" onClick={() => fileInputRef.current?.click()}><FileAudio size={17} /> Enviar arquivo</button>
+          <input ref={fileInputRef} type="file" accept="audio/*" hidden onChange={pickFile} />
         </div>
         <Button variant="primary" className="capture-submit" disabled={!text.trim()} onClick={captureAndAnalyze} trailing={<PaperPlaneTilt size={17} weight="fill" />}>
           Analisar contexto
@@ -117,18 +161,16 @@ export function SmartInboxView(props: ContextFlowProps) {
         </div>
         <span className="queue-count">{active.length}</span>
       </div>
-      {active.map((item) => <InboxCard
-        key={item.id}
-        item={item}
-        onOpen={() => item.suggestion ? setSelectedId(item.id) : analyze(item)}
-      />)}
+      {active.map((item) => <InboxCard key={item.id} item={item} onOpen={() => setSelectedId(item.id)} />)}
     </section>
   </div>
 }
 
 export function ContextReviewQueue(props: ContextFlowProps) {
-  const { state } = props
+  const { state, actions } = props
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  useInboxPolling(state, actions)
+
   const pending = state.inbox.filter((item) => item.status === 'Aguardando confirmação' && item.suggestion)
   const selected = pending.find((item) => item.id === selectedId)
 
@@ -143,7 +185,6 @@ export function ContextReviewQueue(props: ContextFlowProps) {
       eyebrow="APROVAÇÃO HUMANA"
       title="Revisão contextual"
       subtitle="Confira evidências e corrija a proposta antes de criar ou atualizar qualquer card."
-      action={<Badge tone="warning" icon={<CloudSlash size={13} />} title="A fila de revisão ainda não é gravada no banco. Ao recarregar, as propostas somem. Persistência prevista para a Fase 4.">Não salvo</Badge>}
     />
     <div className="review-overview view-panel">
       <div className="review-score"><MagicWand size={27} weight="duotone" /><div><strong>{pending.length} propostas</strong><span>aguardando decisão</span></div></div>
@@ -160,14 +201,16 @@ export function ContextReviewQueue(props: ContextFlowProps) {
 function InboxCard({ item, onOpen }: { item: InboxItem; onOpen: () => void }) {
   const suggestion = item.suggestion
   const processed = item.status === 'Processada'
+  const errored = item.status === 'Com erro'
+  const pending = pendingInboxStatuses.includes(item.status)
   return <article className="context-card">
-    <div className="context-source-icon"><FileText size={20} /></div>
+    <div className="context-source-icon">{item.source === 'Áudio' ? <FileAudio size={20} /> : <FileText size={20} />}</div>
     <div className="context-card-main">
       <div className="context-card-top">
         <StatusBadge status={item.status} />
         <span>{item.source} · {item.date}</span>
       </div>
-      <p>{item.text}</p>
+      <p>{item.text || <em>Aguardando transcrição do áudio…</em>}</p>
       {suggestion && <div className="suggestion-preview">
         <span><b>{suggestion.project}</b> / {suggestion.module}</span>
         <span>{suggestion.kind}</span>
@@ -175,16 +218,17 @@ function InboxCard({ item, onOpen }: { item: InboxItem; onOpen: () => void }) {
         <Confidence value={suggestion.confidence} />
       </div>}
     </div>
-    <button className="review-button" disabled={processed} onClick={onOpen}>
-      {processed ? 'Tarefa criada' : suggestion ? 'Revisar proposta' : 'Analisar contexto'}
+    <button className="review-button" disabled={processed || pending || errored} onClick={onOpen}>
+      {processed ? 'Tarefa criada' : errored ? 'Falhou' : pending ? 'Processando…' : 'Revisar proposta'}
       {processed ? <CheckCircle size={16} weight="fill" /> : <MagicWand size={16} />}
     </button>
   </article>
 }
 
-function ContextReviewPanel({ state, setState, actions, notify, item, onBack }: ContextFlowProps & { item: InboxItem; onBack: () => void }) {
+function ContextReviewPanel({ state, actions, notify, item, onBack }: ContextFlowProps & { item: InboxItem; onBack: () => void }) {
   const suggestion = item.suggestion as ContextSuggestion
   const [draft, setDraft] = useState<ContextSuggestion>(suggestion)
+  const [tagsInput, setTagsInput] = useState('')
   const projects = useMemo(() => state.projects.map((project) => project.name), [state.projects])
 
   function patch<K extends keyof ContextSuggestion>(field: K, value: ContextSuggestion[K]) {
@@ -192,15 +236,14 @@ function ContextReviewPanel({ state, setState, actions, notify, item, onBack }: 
   }
 
   function confirm() {
-    // A correção do usuário entra antes: é ela que vira o card gravado.
-    setState(updateInboxSuggestion(state, item.id, draft))
-    void actions.confirmInbox(item.id)
+    const newTags = tagsInput.split(',').map((tag) => tag.trim()).filter(Boolean)
+    void actions.confirmInbox(item.id, { ...draft, newTags })
     onBack()
   }
 
   function discard() {
-    setState(discardInboxItem(state, item.id))
-    notify('Entrada descartada — vale só nesta sessão.', 'info')
+    void actions.discardInbox(item.id)
+    notify('Entrada descartada.', 'info')
     onBack()
   }
 
@@ -243,7 +286,15 @@ function ContextReviewPanel({ state, setState, actions, notify, item, onBack }: 
             {priorities.map((priority) => <option key={priority}>{priority}</option>)}
           </select></label>
         </div>
+        <label>Complexidade<select value={draft.complexity} onChange={(event) => patch('complexity', event.target.value as Complexity)}>
+          {complexities.map((complexity) => <option key={complexity}>{complexity}</option>)}
+        </select></label>
         <label>Próxima ação<textarea value={draft.action} onChange={(event) => patch('action', event.target.value)} /></label>
+        <label>Novas tags (separadas por vírgula)<input
+          value={tagsInput}
+          onChange={(event) => setTagsInput(event.target.value)}
+          placeholder="Ex.: raster, urgente"
+        /></label>
       </section>
 
       <aside className="review-column evidence-column">
@@ -271,11 +322,17 @@ function ColumnTitle({ icon, title }: { icon: ReactNode; title: string }) {
 }
 
 function StatusBadge({ status }: { status: InboxItem['status'] }) {
-  return <span className={`context-status ${status.toLocaleLowerCase().replaceAll(' ', '-').normalize('NFD').replace(/[\u0300-\u036f]/g, '')}`}>{status}</span>
+  return <span className={`context-status ${status.toLocaleLowerCase().replaceAll(' ', '-').normalize('NFD').replace(/[̀-ͯ]/g, '')}`}>{status}</span>
+}
+
+function confidenceTone(value: number): BadgeTone {
+  if (value >= 85) return 'success'
+  if (value >= 60) return 'warning'
+  return 'danger'
 }
 
 function Confidence({ value, large = false }: { value: number; large?: boolean }) {
-  return <div className={`confidence ${large ? 'large' : ''}`}>
+  return <div className={`confidence ${large ? 'large' : ''} tone-${confidenceTone(value)}`}>
     <span>Confiança</span>
     <strong>{value}%</strong>
     {large && <div><i style={{ width: `${value}%` }} /></div>}

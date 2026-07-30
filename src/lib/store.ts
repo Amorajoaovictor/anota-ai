@@ -3,6 +3,7 @@
 import { useCallback, useRef, useState } from 'react'
 import {
   addContext,
+  addInboxItem,
   addNote,
   addProject,
   addProjectAlias,
@@ -11,7 +12,9 @@ import {
   completeTask as completeTaskInState,
   confirmInboxItem,
   convertNoteToTask,
+  discardInboxItem as discardInboxItemInState,
   moveTaskTo,
+  pendingInboxStatuses,
   removeContext as removeContextInState,
   removeProjectAlias,
   removeProjectModule,
@@ -22,23 +25,30 @@ import {
   toggleNotePinned,
   toggleProjectArchived,
   updateContext as updateContextInState,
+  updateInboxSuggestion,
   updateNote as updateNoteInState,
   updateProject as updateProjectInState,
   updateTask as updateTaskInState,
   withDerivedProgress,
   type AppState,
+  type ContextSuggestion,
   type Note,
   type Priority,
   type ProjectContextEntry,
   type Task,
   type TaskStatus,
 } from '../domain'
-import { ApiError, deleteJson, getJson, patchJson, postJson } from './api'
+import { ApiError, deleteJson, getJson, patchJson, postForm, postJson } from './api'
 import type { Notify } from '../ui'
 import {
   toContextCreateBody,
   toContextPatchBody,
+  toDbComplexity,
+  toDbDue,
+  toDbKind,
+  toDbModule,
   toDomainContext,
+  toDomainInbox,
   toDomainNote,
   toDomainProject,
   toDomainTask,
@@ -48,6 +58,7 @@ import {
   toTaskCreateBody,
   toTaskPatchBody,
   type DbContext,
+  type DbInboxItem,
   type DbNote,
   type DbProject,
   type DbTask,
@@ -189,13 +200,91 @@ export function useProjectData(initial: AppState, notify: Notify) {
       })
     },
 
-    /** Caixa de entrada e notas seguem em memória; o card que sai delas, não. */
-    confirmInbox(inboxId: string) {
+    captureInbox(text: string) {
       return mutate({
-        apply: (current) => confirmInboxItem(current, inboxId),
+        apply: (current) => addInboxItem(current, text),
+        invalid: 'Escreva o que aconteceu antes de enviar',
+        persist: ({ before, after }) => {
+          const created = added(before.inbox, after.inbox)
+          return created
+            ? postJson<{ inboxItem: DbInboxItem }>('/api/inbox', { text: created.text })
+            : Promise.resolve(null)
+        },
+        reconcile: (current, result, { before, after }) => {
+          const created = added(before.inbox, after.inbox)
+          return result && created ? replaceInbox(current, created.id, toDomainInbox(result.inboxItem)) : current
+        },
+      })
+    },
+
+    /** Sem otimista: nada para mostrar antes do upload terminar. */
+    async captureInboxAudio(file: File | Blob, caption?: string) {
+      const form = new FormData()
+      form.append('file', file, file instanceof File ? file.name : 'gravacao.webm')
+      if (caption?.trim()) form.append('text', caption.trim())
+      try {
+        const { inboxItem } = await postForm<{ inboxItem: DbInboxItem }>('/api/inbox/audio', form)
+        commit({ ...stateRef.current, inbox: [toDomainInbox(inboxItem), ...stateRef.current.inbox] })
+        notifyRef.current('Áudio enviado — acompanhe o status na lista.')
+      } catch (error) {
+        notifyRef.current(error instanceof ApiError ? error.detail : 'Falha ao enviar áudio', 'error')
+      }
+    },
+
+    /** Aplica a correção do usuário e confirma numa tacada só: se o servidor recusar, os dois voltam juntos. */
+    confirmInbox(inboxId: string, draft: ContextSuggestion & { tags?: string[] }) {
+      return mutate({
+        apply: (current) => confirmInboxItem(updateInboxSuggestion(current, inboxId, draft), inboxId),
         success: 'Tarefa criada no Backlog com contexto registrado.',
-        persist: persistCreatedTask,
-        reconcile: reconcileCreatedTask,
+        persist: ({ before, after }) => {
+          const project = after.projects.find((item) => item.name === draft.project)
+          if (!project) throw new ApiError(0, 'Projeto não encontrado.')
+          return postJson<{ inboxItem: DbInboxItem; task: DbTask | null }>(`/api/inbox/${inboxId}/confirm`, {
+            projectId: project.id,
+            title: draft.title,
+            moduleName: toDbModule(draft.module),
+            kind: toDbKind(draft.kind),
+            priority: draft.priority,
+            complexity: toDbComplexity(draft.complexity),
+            dueAt: toDbDue(draft.due),
+            forecastAt: toDbDue(draft.forecast),
+            tags: draft.newTags ?? [],
+          })
+        },
+        reconcile: (current, result, { before, after }) => {
+          const withInbox = replaceInbox(current, inboxId, toDomainInbox(result.inboxItem as DbInboxItem))
+          const createdTask = added(before.tasks, after.tasks)
+          return result.task && createdTask
+            ? replaceTask(withInbox, createdTask.id, toDomainTask(result.task))
+            : withInbox
+        },
+      })
+    },
+
+    discardInbox(inboxId: string) {
+      return mutate({
+        apply: (current) => discardInboxItemInState(current, inboxId),
+        success: 'Entrada descartada',
+        persist: () => patchJson(`/api/inbox/${inboxId}`, { status: 'Descartada' }),
+      })
+    },
+
+    /**
+     * Só troca localmente o que ainda está em status pendente. Sem essa guarda, um
+     * GET disparado antes de um confirmar/descartar mas respondido depois desfaria
+     * a ação: a resposta atrasada reintroduziria a proposta como se nada tivesse
+     * acontecido.
+     */
+    refreshInbox() {
+      return getJson<{ inbox: DbInboxItem[] }>('/api/inbox').then(({ inbox }) => {
+        const current = stateRef.current
+        const incoming = new Map(inbox.map((item) => [item.id, toDomainInbox(item)]))
+        const merged = current.inbox.map((item) => pendingInboxStatuses.includes(item.status)
+          ? (incoming.get(item.id) ?? item)
+          : item)
+        const knownIds = new Set(current.inbox.map((item) => item.id))
+        const additions = [...incoming.values()].filter((item) => !knownIds.has(item.id))
+        commit({ ...current, inbox: [...additions, ...merged] })
       })
     },
 
@@ -441,5 +530,12 @@ function replaceContext(state: AppState, temporaryId: string, context: ProjectCo
   return {
     ...state,
     contexts: state.contexts.map((item) => item.id === temporaryId ? context : item),
+  }
+}
+
+function replaceInbox(state: AppState, temporaryId: string, inboxItem: AppState['inbox'][number]): AppState {
+  return {
+    ...state,
+    inbox: state.inbox.map((item) => item.id === temporaryId ? inboxItem : item),
   }
 }

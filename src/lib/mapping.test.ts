@@ -5,6 +5,7 @@ import {
   toAppState,
   toDbDate,
   toDbDue,
+  toDomainInbox,
   toDomainMilestone,
   toDomainNote,
   toDomainTask,
@@ -12,6 +13,7 @@ import {
   toTaskCreateBody,
   toTaskPatchBody,
   type DbContext,
+  type DbInboxItem,
   type DbMilestone,
   type DbNote,
   type DbProject,
@@ -80,6 +82,16 @@ const dbContext = (overrides: Partial<DbContext> = {}): DbContext => ({
   title: 'Medidas passam pela CEGEO',
   content: 'Regra combinada com a equipe.',
   createdAt: '2026-07-25T09:00:00.000Z',
+  ...overrides,
+})
+
+const dbInboxItem = (overrides: Partial<DbInboxItem> = {}): DbInboxItem => ({
+  id: 'inbox-1',
+  source: 'TEXT',
+  status: 'AWAITING_CONFIRMATION',
+  text: 'Planta principal travando o mapa',
+  suggestion: { project: 'VistaFor', confidence: 90 },
+  createdAt: '2026-07-29T08:00:00.000Z',
   ...overrides,
 })
 
@@ -194,13 +206,39 @@ describe('tradução entre banco e domínio', () => {
     expect(state.notes.map((note) => note.id)).toEqual(['note-a', 'note-b'])
   })
 
-  it('carrega marcos, notas e contextos; caixa de entrada segue vazia até a Fase 4', () => {
-    const state = toAppState([dbProject()], [dbTask()], [dbMilestone()], [dbNote()], [dbContext()])
+  it('carrega marcos, notas, contextos e caixa de entrada', () => {
+    const state = toAppState([dbProject()], [dbTask()], [dbMilestone()], [dbNote()], [dbContext()], [dbInboxItem()])
 
     expect(state.milestones).toHaveLength(1)
     expect(state.notes).toHaveLength(1)
     expect(state.contexts[0]).toMatchObject({ projectId: 'project-1', taskId: 'task-1' })
+    expect(state.inbox).toHaveLength(1)
+    expect(state.inbox[0]).toMatchObject({ id: 'inbox-1', status: 'Aguardando confirmação' })
+  })
+
+  it('sem entradas na caixa, o estado segue vazio', () => {
+    const state = toAppState([dbProject()], [dbTask()])
     expect(state.inbox).toEqual([])
+  })
+
+  it('traduz status, origem e devolve a sugestão como veio do servidor', () => {
+    const item = toDomainInbox(dbInboxItem())
+    expect(item).toMatchObject({
+      id: 'inbox-1',
+      text: 'Planta principal travando o mapa',
+      source: 'Texto',
+      status: 'Aguardando confirmação',
+      suggestion: { project: 'VistaFor', confidence: 90 },
+    })
+    expect(item.date).not.toBe('')
+  })
+
+  it('entrada sem sugestão ainda mapeia para undefined', () => {
+    expect(toDomainInbox(dbInboxItem({ suggestion: null, status: 'RECEIVED' })).suggestion).toBeUndefined()
+  })
+
+  it('origem de áudio traduz para o rótulo em português', () => {
+    expect(toDomainInbox(dbInboxItem({ source: 'AUDIO' })).source).toBe('Áudio')
   })
 
   it('etiqueta viaja por nome, e a cor só quando existe', () => {

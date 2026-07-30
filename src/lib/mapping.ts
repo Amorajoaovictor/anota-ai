@@ -3,7 +3,11 @@ import {
   withDerivedProgress,
   type AppState,
   type Complexity,
+  type ContextSuggestion,
   type EntryKind,
+  type InboxItem,
+  type InboxSource,
+  type InboxStatus,
   type Milestone,
   type MilestoneStatus,
   type Note,
@@ -50,9 +54,28 @@ const milestoneStatusByDb: Record<string, MilestoneStatus> = {
   CANCELED: 'Cancelado',
 }
 
+const inboxStatusByDb: Record<string, InboxStatus> = {
+  RECEIVED: 'Recebida',
+  TRANSCRIBING: 'Transcrevendo',
+  ANALYZING: 'Analisando contexto',
+  AWAITING_CONFIRMATION: 'Aguardando confirmação',
+  PROCESSED: 'Processada',
+  DISCARDED: 'Descartada',
+  ERROR: 'Com erro',
+}
+
+const inboxSourceByDb: Record<string, InboxSource> = {
+  TEXT: 'Texto',
+  AUDIO: 'Áudio',
+  TRELLO: 'Trello',
+  MCP: 'MCP',
+  SPREADSHEET: 'Planilha',
+}
+
 const statusToDb = invert(statusByDb)
 const kindToDb = invert(kindByDb)
 const milestoneStatusToDb = invert(milestoneStatusByDb)
+const inboxStatusToDb = invert(inboxStatusByDb)
 
 export type DbTag = {
   id: string
@@ -119,6 +142,15 @@ export type DbContext = {
   taskId: string | null
   title: string
   content: string
+  createdAt: string | Date
+}
+
+export type DbInboxItem = {
+  id: string
+  source: string
+  status: string
+  text: string
+  suggestion: unknown
   createdAt: string | Date
 }
 
@@ -204,9 +236,20 @@ export function toDomainContext(context: DbContext): ProjectContextEntry {
   }
 }
 
+export function toDomainInbox(item: DbInboxItem): InboxItem {
+  return {
+    id: item.id,
+    text: item.text,
+    source: inboxSourceByDb[item.source] ?? 'Texto',
+    status: inboxStatusByDb[item.status] ?? 'Recebida',
+    date: formatTimestamp(item.createdAt),
+    // O servidor é quem escreve nesse formato (`ai.classify`), então não precisa validar de novo aqui.
+    suggestion: (item.suggestion as ContextSuggestion | null) ?? undefined,
+  }
+}
+
 /**
- * Estado inicial da UI. Só a caixa de entrada continua vazia — ela é da Fase 4.
- * Marco entra somente para leitura: criar e editar marco é Fase 5.
+ * Estado inicial da UI. Marco entra somente para leitura: criar e editar marco é Fase 5.
  */
 export function toAppState(
   projects: DbProject[],
@@ -214,6 +257,7 @@ export function toAppState(
   milestones: DbMilestone[] = [],
   notes: DbNote[] = [],
   contexts: DbContext[] = [],
+  inbox: DbInboxItem[] = [],
 ): AppState {
   const domainTasks = tasks.map(toDomainTask)
   return withDerivedProgress({
@@ -224,9 +268,13 @@ export function toAppState(
     // `reorderNotes` assume ordem do array igual à ordem das posições.
     notes: notes.map(toDomainNote).sort((left, right) => left.position - right.position),
     contexts: contexts.map(toDomainContext),
-    inbox: [],
+    inbox: inbox.map(toDomainInbox),
     activity: [],
   })
+}
+
+export function toDbInboxStatus(status: InboxStatus): string {
+  return inboxStatusToDb[status] ?? 'RECEIVED'
 }
 
 export function toDbStatus(status: TaskStatus): string {
@@ -296,7 +344,7 @@ function toDate(value: string | Date | null | undefined): Date | null {
 export type TaskPatch = Partial<Pick<Task, 'title' | 'description' | 'module' | 'kind' | 'status' | 'priority' | 'due' | 'forecast' | 'complexity' | 'dependsOnIds' | 'milestoneIds' | 'tagIds'>>
 
 /** `Geral` é o rótulo de "sem módulo" na tela; no banco vira vínculo nulo. */
-function toDbModule(module: string | undefined) {
+export function toDbModule(module: string | undefined) {
   const name = module?.trim()
   return !name || name === 'Geral' ? '' : name
 }
