@@ -1,4 +1,4 @@
-import type { ContextSuggestion } from '../../domain'
+import type { AiPlan } from './plan'
 
 /**
  * Contrato plugável do agente contextual (PRD 8.1 e 25.4: modelo substituível,
@@ -8,6 +8,7 @@ import type { ContextSuggestion } from '../../domain'
  */
 
 export type ClassificationProject = {
+  id: string
   name: string
   aliases: string[]
   modules: string[]
@@ -15,17 +16,28 @@ export type ClassificationProject = {
 }
 
 export type ClassificationTask = {
+  id: string
   title: string
   project: string
+}
+
+export type ClassificationContext = {
+  id: string
+  projectId: string
+  project: string
+  category: string
+  title: string
+  content: string
 }
 
 export type ClassificationInput = {
   text: string
   projects: ClassificationProject[]
   tasks: ClassificationTask[]
+  contexts: ClassificationContext[]
 }
 
-export type ClassificationResult = ContextSuggestion
+export type ClassificationResult = AiPlan
 
 export type LlmProvider = {
   classify(input: ClassificationInput): Promise<ClassificationResult>

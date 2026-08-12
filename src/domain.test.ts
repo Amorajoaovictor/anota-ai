@@ -383,8 +383,9 @@ describe('Central de Projetos — fluxos críticos', () => {
         confidence: 93,
       },
     })
-    expect(result.inbox[0].suggestion?.evidence.length).toBeGreaterThan(1)
-    expect(result.inbox[0].suggestion?.duplicates[0].toLocaleLowerCase()).toContain('raster')
+    const suggestion = result.inbox[0].suggestion
+    expect(suggestion?.evidence.length).toBeGreaterThan(1)
+    expect(suggestion && !('actions' in suggestion) ? suggestion.duplicates[0].toLocaleLowerCase() : '').toContain('raster')
   })
 
   it('confirma correções manuais e cria uma única tarefa no Backlog', () => {

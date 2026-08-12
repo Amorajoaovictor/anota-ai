@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { UnknownJobTypeError, isJobType, resolveHandler } from './handlers'
-import { drainJobs } from './runner'
+import { DEFAULT_JOB_TIMEOUT_MS, drainJobs } from './runner'
 import { createFakeJobStore } from '../../test/fake-prisma'
 
 const fixedNow = new Date('2026-07-27T12:00:00.000Z')
@@ -8,6 +8,10 @@ const now = () => fixedNow
 const due = new Date('2026-07-27T11:30:00.000Z')
 
 describe('runner da fila', () => {
+  it('limita cada job a cinco minutos por padrão', () => {
+    expect(DEFAULT_JOB_TIMEOUT_MS).toBe(5 * 60_000)
+  })
+
   it('executa os jobs devidos até o tamanho do lote', async () => {
     const store = createFakeJobStore([
       { id: 'job-1', runAt: due },
@@ -35,6 +39,25 @@ describe('runner da fila', () => {
     expect(result).toMatchObject({ claimed: 1, completed: 0, failed: 1 })
     expect(store.jobs[0]).toMatchObject({ status: 'PENDING', lastError: 'provedor fora do ar' })
     expect(store.jobs[0]!.runAt.getTime()).toBeGreaterThan(now().getTime())
+  })
+
+  it('interrompe a espera pelo handler no timeout e continua o lote', async () => {
+    const store = createFakeJobStore([
+      { id: 'job-lento', runAt: due },
+      { id: 'job-seguinte', runAt: due },
+    ])
+    const handler = vi.fn()
+      .mockImplementationOnce(() => new Promise((resolve) => setTimeout(resolve, 50)))
+      .mockResolvedValueOnce(undefined)
+
+    const result = await drainJobs(store, { batchSize: 2, jobTimeoutMs: 10, resolve: () => handler, now })
+
+    expect(result).toMatchObject({ claimed: 2, completed: 1, failed: 1 })
+    expect(store.jobs.find((job) => job.id === 'job-lento')).toMatchObject({
+      status: 'PENDING',
+      lastError: 'Job excedeu timeout de 10 ms.',
+    })
+    expect(store.jobs.find((job) => job.id === 'job-seguinte')?.status).toBe('DONE')
   })
 
   it('não tenta de novo job de tipo desconhecido', async () => {

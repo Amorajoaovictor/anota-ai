@@ -1,6 +1,8 @@
 import { resolveHandler, UnknownJobTypeError, type JobHandler } from './handlers'
 import { claimNext, completeJob, failJob, releaseStaleJobs, type JobRepository } from './queue'
 
+export const DEFAULT_JOB_TIMEOUT_MS = 5 * 60_000
+
 export type DrainResult = {
   claimed: number
   completed: number
@@ -12,6 +14,7 @@ export type DrainOptions = {
   batchSize?: number
   workerId?: string
   lockTimeoutMs?: number
+  jobTimeoutMs?: number
   resolve?: (type: string) => JobHandler
   now?: () => Date
 }
@@ -21,6 +24,7 @@ export async function drainJobs(repository: JobRepository, options: DrainOptions
   const workerId = options.workerId ?? `worker-${process.pid}`
   const resolve = options.resolve ?? resolveHandler
   const now = options.now ?? (() => new Date())
+  const jobTimeoutMs = options.jobTimeoutMs ?? DEFAULT_JOB_TIMEOUT_MS
 
   const released = await releaseStaleJobs(repository, options.lockTimeoutMs ?? 5 * 60_000, now())
   const result: DrainResult = { claimed: 0, completed: 0, failed: 0, released: released.count }
@@ -32,7 +36,7 @@ export async function drainJobs(repository: JobRepository, options: DrainOptions
 
     try {
       const handler = resolve(job.type)
-      await handler(job)
+      await runWithTimeout(handler(job), jobTimeoutMs)
       await completeJob(repository, job.id)
       result.completed += 1
     } catch (error) {
@@ -43,4 +47,18 @@ export async function drainJobs(repository: JobRepository, options: DrainOptions
   }
 
   return result
+}
+
+async function runWithTimeout<T>(operation: Promise<T>, timeoutMs: number): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      operation,
+      new Promise<never>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`Job excedeu timeout de ${timeoutMs} ms.`)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timeout) clearTimeout(timeout)
+  }
 }

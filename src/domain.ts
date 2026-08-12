@@ -1,3 +1,5 @@
+import type { AiPlan } from './server/ai/plan'
+
 export type TaskStatus = 'Backlog' | 'Em andamento' | 'Bloqueada' | 'Em validação' | 'Concluída' | 'Cancelada'
 export type Priority = 'P0' | 'P1' | 'P2' | 'P3'
 export type MilestoneStatus = 'Planejado' | 'Em andamento' | 'Atingido' | 'Adiado' | 'Cancelado'
@@ -116,7 +118,7 @@ export type InboxItem = {
   source: InboxSource
   status: InboxStatus
   date: string
-  suggestion?: ContextSuggestion
+  suggestion?: ContextSuggestion | AiPlan
 }
 /**
  * Status em que o item ainda depende de um job rodar (`ai.classify`/`audio.transcribe`).
@@ -722,7 +724,7 @@ export function updateInboxSuggestion(
 ): AppState {
   return {
     ...state,
-    inbox: state.inbox.map((entry) => entry.id === inboxId && entry.suggestion
+    inbox: state.inbox.map((entry) => entry.id === inboxId && entry.suggestion && !('actions' in entry.suggestion)
       ? { ...entry, suggestion: { ...entry.suggestion, ...patch } }
       : entry),
   }
@@ -730,23 +732,24 @@ export function updateInboxSuggestion(
 
 export function confirmInboxItem(state: AppState, inboxId: string): AppState {
   const item = state.inbox.find((entry) => entry.id === inboxId)
-  if (!item?.suggestion || item.status === 'Processada') return state
+  if (!item?.suggestion || 'actions' in item.suggestion || item.status === 'Processada') return state
+  const suggestion = item.suggestion
   if (state.tasks.some((task) => task.sourceInboxId === inboxId)) {
     return {
       ...state,
       inbox: state.inbox.map((entry) => entry.id === inboxId ? { ...entry, status: 'Processada' } : entry),
     }
   }
-  const project = state.projects.find((entry) => entry.name === item.suggestion?.project)
+  const project = state.projects.find((entry) => entry.name === suggestion.project)
   const task: Task = {
     id: `task-from-${inboxId}`,
-    title: item.suggestion.title,
-    project: item.suggestion.project,
-    module: item.suggestion.module,
-    kind: item.suggestion.kind,
+    title: suggestion.title,
+    project: suggestion.project,
+    module: suggestion.module,
+    kind: suggestion.kind,
     status: 'Backlog',
-    priority: item.suggestion.priority,
-    due: item.suggestion.due,
+    priority: suggestion.priority,
+    due: suggestion.due,
     color: project?.color ?? '#79dfb2',
     sourceInboxId: inboxId,
   }

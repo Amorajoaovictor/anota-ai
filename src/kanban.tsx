@@ -69,7 +69,6 @@ function KanbanColumn({ status, tasks, milestones, onDrop, onOpen, onStatusChang
     <header>
       <h2><i />{status}</h2>
       <em className={overLimit ? 'over-limit' : ''}>{tasks.length}{limit !== undefined ? `/${limit}` : ''}</em>
-      <button className="column-add" aria-label={`Nova tarefa em ${status}`} onClick={onCreate}><Plus size={15} weight="bold" /></button>
     </header>
     <div className="kanban-list">
       {tasks.map((task) => <KanbanCard
@@ -83,6 +82,9 @@ function KanbanColumn({ status, tasks, milestones, onDrop, onOpen, onStatusChang
       />)}
       <div className={`kanban-drop-hint ${zone.over ? 'visible' : ''}`}>Soltar em {status}</div>
       {!tasks.length && !zone.active && <p className="kanban-empty">Nenhum card</p>}
+      <button className="kanban-add-ghost" aria-label={`Nova tarefa em ${status}`} onClick={onCreate}>
+        <Plus size={14} weight="bold" /> Adicionar card
+      </button>
     </div>
   </section>
 }

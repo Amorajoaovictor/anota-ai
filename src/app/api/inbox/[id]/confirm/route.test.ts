@@ -13,11 +13,14 @@ const fakes = vi.hoisted(() => ({
   projectTagFindMany: vi.fn(),
   projectTagUpsert: vi.fn(),
   recordAuditEvent: vi.fn().mockResolvedValue(undefined),
+  transaction: vi.fn(),
+  executeApprovedAiPlan: vi.fn(),
 }))
 
 vi.mock('../../../../../lib/auth/server', () => ({ requireCurrentUserId: fakes.requireCurrentUserId }))
 vi.mock('../../../../../lib/prisma', () => ({
   getPrisma: () => ({
+    $transaction: fakes.transaction,
     inboxItem: { findFirst: fakes.inboxFindFirst, update: fakes.inboxUpdate },
     project: { findFirst: fakes.projectFindFirst },
     task: { create: fakes.taskCreate },
@@ -27,6 +30,7 @@ vi.mock('../../../../../lib/prisma', () => ({
   }),
 }))
 vi.mock('../../../../../server/audit-log', () => ({ recordAuditEvent: fakes.recordAuditEvent }))
+vi.mock('../../../../../server/ai/plan-executor', () => ({ executeApprovedAiPlan: fakes.executeApprovedAiPlan }))
 
 import { POST } from './route'
 
@@ -48,6 +52,8 @@ describe('POST /api/inbox/[id]/confirm', () => {
     fakes.projectTagFindMany.mockReset().mockResolvedValue([])
     fakes.projectTagUpsert.mockReset()
     fakes.recordAuditEvent.mockClear()
+    fakes.transaction.mockReset().mockImplementation((callback) => callback({}))
+    fakes.executeApprovedAiPlan.mockReset()
   })
 
   it('responde 401 sem sessão', async () => {
@@ -105,5 +111,23 @@ describe('POST /api/inbox/[id]/confirm', () => {
     expect(response.status).toBe(200)
     expect(fakes.taskCreate).not.toHaveBeenCalled()
     expect(fakes.recordAuditEvent).not.toHaveBeenCalled()
+  })
+
+  it('executa proposta multi-entidade em transação e devolve todas as criações', async () => {
+    const plan = {
+      summary: 'Contextos e tarefas.', confidence: 90, evidence: ['x'],
+      actions: [{ id: 'context-1', entity: 'context', operation: 'create', dependsOn: [], confidence: 90, evidence: ['x'], data: {} }],
+    }
+    fakes.executeApprovedAiPlan.mockResolvedValue({
+      kind: 'executed', inboxItem: { id: 'inbox-1', status: 'PROCESSED' },
+      created: [{ actionId: 'context-1', entity: 'context', id: 'db-context-1', projectId: 'project-1' }],
+    })
+
+    const response = await confirm(plan)
+
+    expect(response.status).toBe(201)
+    expect(fakes.transaction).toHaveBeenCalledOnce()
+    expect(fakes.executeApprovedAiPlan).toHaveBeenCalledWith({}, 'user-1', 'inbox-1', plan)
+    expect(fakes.recordAuditEvent).toHaveBeenCalledWith(expect.objectContaining({ action: 'inbox.plan.executed' }))
   })
 })

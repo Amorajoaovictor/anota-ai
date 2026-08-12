@@ -8,12 +8,14 @@ import { z } from 'zod'
 
 const titleSchema = z.string().trim().min(1, 'Título do contexto é obrigatório.').max(200)
 const contentSchema = z.string().trim().min(1, 'Conteúdo do contexto é obrigatório.')
+export const contextCategorySchema = z.enum(['FACT', 'DECISION', 'RULE', 'VOCABULARY', 'MEETING'])
 
 export const contextInputSchema = z.object({
   projectId: z.string().trim().min(1, 'Projeto é obrigatório.'),
   taskId: z.string().trim().min(1).nullable().optional(),
   title: titleSchema,
   content: contentSchema,
+  category: contextCategorySchema.optional(),
 }).strict()
 
 export const contextPatchSchema = z.object({
@@ -75,6 +77,7 @@ export async function createContext(
       taskId: await validTaskId(repository, project.id, parsed.data.taskId),
       title: parsed.data.title,
       content: parsed.data.content,
+      ...(parsed.data.category ? { category: parsed.data.category } : {}),
     },
   })
   return { kind: 'created', context }

@@ -71,10 +71,11 @@ async function handleAiClassify(job: JobRecord) {
     })
     if (!item) return
 
-    const [projects, tasks] = await Promise.all([
+    const [projects, tasks, contexts] = await Promise.all([
       prisma.project.findMany({
         where: { ownerId: item.ownerId, status: 'ACTIVE' },
         select: {
+          id: true,
           name: true,
           aliases: { select: { value: true } },
           modules: { select: { name: true } },
@@ -83,8 +84,14 @@ async function handleAiClassify(job: JobRecord) {
       }),
       prisma.task.findMany({
         where: { project: { ownerId: item.ownerId } },
-        select: { title: true, project: { select: { name: true } } },
+        select: { id: true, title: true, project: { select: { name: true } } },
         take: 200,
+      }),
+      prisma.projectContext.findMany({
+        where: { project: { ownerId: item.ownerId } },
+        select: { id: true, projectId: true, category: true, title: true, content: true, project: { select: { name: true } } },
+        orderBy: { updatedAt: 'desc' },
+        take: 500,
       }),
     ])
 
@@ -92,12 +99,21 @@ async function handleAiClassify(job: JobRecord) {
     const suggestion = await llm.classify({
       text: item.text,
       projects: projects.map((project) => ({
+        id: project.id,
         name: project.name,
         aliases: project.aliases.map((alias) => alias.value),
         modules: project.modules.map((module) => module.name),
         tags: project.tags.map((tag) => tag.name),
       })),
-      tasks: tasks.map((task) => ({ title: task.title, project: task.project.name })),
+      tasks: tasks.map((task) => ({ id: task.id, title: task.title, project: task.project.name })),
+      contexts: contexts.map((context) => ({
+        id: context.id,
+        projectId: context.projectId,
+        project: context.project.name,
+        category: context.category,
+        title: context.title,
+        content: context.content,
+      })),
     })
 
     await prisma.inboxItem.update({
@@ -108,7 +124,7 @@ async function handleAiClassify(job: JobRecord) {
       action: 'inbox.classified',
       entityType: 'InboxItem',
       entityId: payload.inboxItemId,
-      metadata: { project: suggestion.project, confidence: suggestion.confidence, evidence: suggestion.evidence },
+      metadata: { confidence: suggestion.confidence, evidence: suggestion.evidence, actions: suggestion.actions.length },
     })
   } catch (error) {
     if (isFinalAttempt(job)) {

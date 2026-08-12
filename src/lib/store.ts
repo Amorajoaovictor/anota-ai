@@ -40,6 +40,7 @@ import {
 } from '../domain'
 import { ApiError, deleteJson, getJson, patchJson, postForm, postJson } from './api'
 import type { Notify } from '../ui'
+import type { AiPlan } from '../server/ai/plan'
 import {
   toContextCreateBody,
   toContextPatchBody,
@@ -232,7 +233,15 @@ export function useProjectData(initial: AppState, notify: Notify) {
     },
 
     /** Aplica a correção do usuário e confirma numa tacada só: se o servidor recusar, os dois voltam juntos. */
-    confirmInbox(inboxId: string, draft: ContextSuggestion & { tags?: string[] }) {
+    confirmInbox(inboxId: string, draft: (ContextSuggestion & { tags?: string[] }) | AiPlan) {
+      if (isAiPlanDraft(draft)) {
+        return postJson(`/api/inbox/${inboxId}/confirm`, draft)
+          .then(() => {
+            notifyRef.current(`${draft.actions.length} ações executadas. Atualizando dados.`)
+            if (typeof window !== 'undefined') window.location.reload()
+          })
+          .catch((error) => notifyRef.current(error instanceof ApiError ? error.detail : 'Falha ao executar plano da IA', 'error'))
+      }
       return mutate({
         apply: (current) => confirmInboxItem(updateInboxSuggestion(current, inboxId, draft), inboxId),
         success: 'Tarefa criada no Backlog com contexto registrado.',
@@ -460,6 +469,10 @@ export function useProjectData(initial: AppState, notify: Notify) {
   }
 
   return { state, setState, actions }
+}
+
+function isAiPlanDraft(value: ContextSuggestion | AiPlan): value is AiPlan {
+  return 'actions' in value && Array.isArray(value.actions)
 }
 
 export type ProjectActions = ReturnType<typeof useProjectData>['actions']

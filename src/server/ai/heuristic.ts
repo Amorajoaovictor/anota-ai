@@ -1,4 +1,4 @@
-import { suggestComplexity, suggestForecast, type EntryKind, type Priority } from '../../domain'
+import { suggestComplexity, type EntryKind, type Priority } from '../../domain'
 import {
   SttNotConfiguredError,
   type ClassificationInput,
@@ -39,21 +39,46 @@ export class HeuristicLlmProvider implements LlmProvider {
     const complexity = suggestComplexity(kind, priority)
     const duplicates = best.match.score > 0 ? findDuplicates(normalizedText, best.project.name, input.tasks) : []
 
-    return {
-      title: toTitle(input.text),
-      summary: best.match.score > 0
+    const summary = best.match.score > 0
         ? `Entrada associada a ${best.project.name} por correspondência de vocabulário do projeto.`
-        : 'Nenhum projeto teve correspondência clara — confirme antes de aprovar.',
-      project: best.project.name,
-      module: best.match.module ?? 'Geral',
-      kind,
-      priority,
-      complexity,
+        : 'Nenhum projeto teve correspondência clara — confirme antes de aprovar.'
+    const context = {
+      id: 'context-1' as const,
+      entity: 'context' as const,
+      operation: 'create' as const,
+      dependsOn: [],
       confidence: best.match.confidence,
       evidence: best.match.evidence,
-      duplicates,
-      action: defaultAction(kind),
-      forecast: suggestForecast(complexity),
+      data: {
+        project: { existingId: best.project.id },
+        category: kind === 'Decisão' ? 'DECISION' as const : 'FACT' as const,
+        title: toTitle(input.text),
+        content: input.text.trim(),
+      },
+    }
+    const task = {
+      id: 'task-1' as const,
+      entity: 'task' as const,
+      operation: 'create' as const,
+      dependsOn: [],
+      confidence: best.match.confidence,
+      evidence: best.match.evidence,
+      data: {
+        project: { existingId: best.project.id },
+        title: toTitle(input.text),
+        description: defaultAction(kind),
+        moduleName: best.match.module,
+        kind: toDbKind(kind),
+        priority,
+        complexity: complexity === 'Baixa' ? 1 as const : complexity === 'Média' ? 2 as const : 3 as const,
+      },
+    }
+
+    return {
+      summary: duplicates.length ? `${summary} Possível duplicidade: ${duplicates.join(', ')}.` : summary,
+      confidence: best.match.confidence,
+      evidence: best.match.evidence,
+      actions: duplicates.length ? [context] : [context, task],
     }
   }
 }
@@ -138,6 +163,14 @@ function defaultAction(kind: EntryKind): string {
     case 'Solicitação externa': return 'Confirmar prazo e responsável com quem solicitou.'
     default: return 'Detalhar e validar a próxima ação com o responsável.'
   }
+}
+
+function toDbKind(kind: EntryKind) {
+  const values = {
+    Tarefa: 'TASK', Bug: 'BUG', Melhoria: 'IMPROVEMENT', Funcionalidade: 'FEATURE', Decisão: 'DECISION',
+    'Solicitação externa': 'EXTERNAL_REQUEST', 'Ideia futura': 'FUTURE_IDEA', Pergunta: 'QUESTION',
+  } as const
+  return values[kind]
 }
 
 function toTitle(text: string): string {

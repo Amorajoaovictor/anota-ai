@@ -3,7 +3,6 @@ import {
   withDerivedProgress,
   type AppState,
   type Complexity,
-  type ContextSuggestion,
   type EntryKind,
   type InboxItem,
   type InboxSource,
@@ -244,7 +243,7 @@ export function toDomainInbox(item: DbInboxItem): InboxItem {
     status: inboxStatusByDb[item.status] ?? 'Recebida',
     date: formatTimestamp(item.createdAt),
     // O servidor é quem escreve nesse formato (`ai.classify`), então não precisa validar de novo aqui.
-    suggestion: (item.suggestion as ContextSuggestion | null) ?? undefined,
+    suggestion: (item.suggestion as InboxItem['suggestion'] | null) ?? undefined,
   }
 }
 

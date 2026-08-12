@@ -211,6 +211,8 @@ A necessidade de confirmação deverá variar conforme a ação:
 - Atualizar várias tarefas: confirmação reforçada.
 - Modificar código ou executar comandos: aprovação obrigatória.
 
+Uma entrada poderá produzir uma proposta única com várias ações relacionadas. A revisão deverá mostrar o plano completo, permitir correções e executar somente as ações aprovadas, respeitando a ordem de dependência entre elas.
+
 ## 6.4 Backend como fonte de verdade
 
 O agente não deverá alterar o banco diretamente.
@@ -226,6 +228,8 @@ A criação manual de tarefa deverá estar acessível a partir de qualquer tela 
 ## 6.6 Aprendizado corrigível
 
 O agente deverá aprender com correções do usuário, mas toda associação aprendida deverá ser visualizável e editável.
+
+Quando uma correção manual revelar uma regra, um significado de vocabulário ou uma associação recorrente, o sistema deverá permitir registrá-la como contexto do projeto. Correções de nomes poderão também originar aliases, módulos ou tags estruturados, sem criar usuários ou entidades de pessoas.
 
 ---
 
@@ -732,6 +736,18 @@ Cada tarefa deverá possuir:
 
 Marcos representam pontos-chave de resultado, não etapas do fluxo. Portanto, não substituem status, tarefas ou prazos. Ao remover um marco, as tarefas são preservadas e somente o vínculo é removido.
 
+## 10.9 Reunião
+
+Reunião representa um lembrete simples, não uma transcrição ou ata.
+
+- Título.
+- Descrição.
+- Link opcional.
+- Data e horário usados pelos lembretes e notificações.
+- Projeto opcional.
+
+Reuniões deverão aparecer em uma visão global e, quando vinculadas a um projeto, também na aba de reuniões desse projeto. Decisões, regras, vocabulário e tarefas extraídos de um áudio continuam sendo entidades/contextos próprios e não campos da reunião.
+
 ---
 
 # 11. Prioridades e status
@@ -847,7 +863,14 @@ A tela deverá apresentar:
 - Módulo sugerido.
 - Tipo da entrada.
 - Cards sugeridos.
+- Reuniões identificadas.
+- Notas sugeridas para informações importantes ou relevantes.
+- Marcos sugeridos.
 - Decisões identificadas.
+- Contextos e tags de apoio para classificar e enriquecer tarefas futuras.
+- Projetos, tarefas, marcos, dependências, aliases, módulos e tags propostos.
+- Ordem de execução e vínculos entre ações da mesma proposta.
+- Controle para corrigir ou rejeitar cada ação antes da aprovação do plano.
 - Prioridade sugerida.
 - Prazo identificado.
 - Responsável identificado.
@@ -1121,11 +1144,16 @@ Criar um card não poderá depender da tela em que o usuário está nem do agent
 
 ## 13.3 Extração contextual
 
-A extração não deverá ser limitada à criação de cards.
+A extração deverá priorizar cards, principalmente tarefas, sem ignorar reuniões, notas e marcos identificados na entrada.
+
+Uma única entrada poderá gerar várias entidades relacionadas, inclusive em projetos diferentes. Cards são a saída principal do agente. Quando a entrada mencionar uma reunião, o agente deverá propor a criação da reunião. Quando houver informação importante ou relevante que não seja uma tarefa, reunião ou marco, o agente deverá propor uma nota. Contextos e tags são saídas de apoio para melhorar a identificação, classificação e organização de tarefas futuras.
 
 O agente poderá identificar:
 
 - Tarefas.
+- Reuniões.
+- Notas.
+- Marcos.
 - Bugs.
 - Decisões.
 - Bloqueios.
@@ -1135,6 +1163,15 @@ O agente poderá identificar:
 - Atualizações de status.
 - Dependências.
 - Informações para a memória do projeto.
+- Projetos.
+- Aliases.
+- Módulos.
+- Tags.
+- Regras.
+- Vocabulário.
+- Contextos e tags que ajudem o agente a compreender e organizar tarefas futuras.
+
+O agente poderá criar qualquer entidade de negócio necessária ao mundo do usuário, exceto usuários ou entidades de pessoas. Registros internos de infraestrutura, como jobs e auditoria, continuam sob controle exclusivo da aplicação.
 
 ---
 
@@ -1566,9 +1603,21 @@ Toda ação proposta pelo agente deverá registrar:
 - O áudio é transcrito.
 - A transcrição pode ser editada.
 - A transcrição é analisada pelo agente contextual.
-- Tarefas só são criadas após confirmação.
+- Um áudio pode produzir várias entidades relacionadas, priorizando cards, reuniões, notas e marcos.
+- Reuniões mencionadas aparecem como propostas de reunião; informações importantes ou relevantes aparecem como propostas de nota.
+- Contextos e tags podem ser propostos como apoio para tarefas futuras, sem substituir as saídas principais.
+- Contextos, tarefas e demais entidades só são criados após confirmação.
+- O agente não cria usuários ou entidades de pessoas.
 
-## 21.5 Trello
+## 21.5 Reuniões e notificações
+
+- É possível criar reunião com título, descrição, link opcional, data e horário.
+- Projeto é opcional.
+- Existe uma aba global de reuniões.
+- Cada projeto possui uma aba com suas reuniões vinculadas.
+- Reuniões e prazos geram lembretes e notificações.
+
+## 21.6 Trello
 
 - O usuário consegue conectar um quadro.
 - Listas são associadas a status.
@@ -1577,7 +1626,7 @@ Toda ação proposta pelo agente deverá registrar:
 - Conflitos não provocam perda silenciosa.
 - Eventos repetidos não criam tarefas duplicadas.
 
-## 21.6 Planejamento
+## 21.7 Planejamento
 
 - O sistema gera um plano diário.
 - Toda recomendação possui motivo.
@@ -1585,7 +1634,7 @@ Toda ação proposta pelo agente deverá registrar:
 - Tarefas bloqueadas possuem alternativa.
 - O usuário pode alterar a ordem.
 
-## 21.7 MCP
+## 21.8 MCP
 
 - Um cliente autorizado consegue consultar projetos.
 - O agente consegue buscar contexto.
@@ -1633,8 +1682,13 @@ Toda ação proposta pelo agente deverá registrar:
 ## Fase 4 — IA, áudio e Revisão IA
 
 - Receber texto, áudio e anexos; transcrever e excluir áudio de entrada após processamento.
-- IA produz uma proposta única de classificação, prazo, previsão, complexidade e ação.
+- IA produz uma proposta única composta por várias ações tipadas e relacionadas.
+- Cards, principalmente tarefas, são a saída principal. Reuniões, notas e marcos também são saídas centrais da IA.
+- Criar proposta de reunião quando a entrada falar de uma reunião e proposta de nota quando houver informação importante ou relevante.
+- Permitir criar, a partir da mesma entrada, projetos, tarefas, reuniões, notas, marcos, dependências, aliases, módulos, tags e contextos de apoio, mas nunca usuários ou entidades de pessoas.
+- Resolver dependências entre ações da proposta, inclusive entidades que referenciam outra entidade ainda não criada.
 - Criar aba Revisão IA para aprovar, editar ou rejeitar propostas antes de executar ações sensíveis.
+- Registrar correções manuais relevantes como contexto e vocabulário editável, quando necessário.
 - Permitir criação automática de tags e aliases; manter notas manuais fora de IA/MCP por padrão.
 
 ## Fase 5 — Roadmap, prazos, agenda e lembretes
@@ -1642,6 +1696,8 @@ Toda ação proposta pelo agente deverá registrar:
 - Criar visão de Marcos, vínculos muitos-para-muitos com cards, Roadmap e histórico de marcos.
 - Criar telas Hoje e Prazos.
 - Criar agenda/calendário derivada de cards, roadmap, prazos, previsões e reuniões; edição nela atualiza origem.
+- Criar entidade Reunião com título, descrição, link opcional, data/horário e projeto opcional, além de abas global e por projeto.
+- Enviar lembretes e notificações para reuniões e prazos.
 - Lembrar metade do prazo, 7, 3 e 1 dia antes para prazo confirmado e previsão. Previsão vencida é alerta, não atraso.
 
 ## Fase 6 — Plano de ação
@@ -1774,6 +1830,9 @@ Toda ação proposta pelo agente deverá registrar:
 15. O agente pessoal e o agente desenvolvedor serão separados.
 16. Alterações de código não farão parte do MVP inicial.
 17. A arquitetura será preparada para mobile desde o início.
+18. Uma entrada de IA poderá criar várias entidades de negócio relacionadas, priorizando cards, reuniões, notas e marcos, exceto usuários ou entidades de pessoas.
+19. Contextos e tags apoiarão a identificação e organização de tarefas futuras; correções manuais poderão alimentar contexto e vocabulário editável.
+20. Reuniões serão lembretes simples com projeto opcional e terão visões global e por projeto.
 
 ---
 

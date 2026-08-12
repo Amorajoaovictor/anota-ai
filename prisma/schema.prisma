@@ -65,6 +65,14 @@ enum InboxSource {
   SPREADSHEET
 }
 
+enum ContextCategory {
+  FACT
+  DECISION
+  RULE
+  VOCABULARY
+  MEETING
+}
+
 enum JobStatus {
   PENDING
   RUNNING
@@ -232,6 +240,7 @@ model ProjectContext {
   task      Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
   title     String
   content   String
+  category  ContextCategory @default(FACT)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

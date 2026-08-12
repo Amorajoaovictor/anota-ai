@@ -4,6 +4,7 @@ import type { JobRecord } from './queue'
 const fakes = vi.hoisted(() => ({
   inboxItem: { findUnique: vi.fn(), update: vi.fn() },
   project: { findMany: vi.fn() },
+  projectContext: { findMany: vi.fn() },
   task: { findMany: vi.fn() },
   job: { create: vi.fn() },
   classify: vi.fn(),
@@ -14,7 +15,7 @@ const fakes = vi.hoisted(() => ({
 }))
 
 vi.mock('../../lib/prisma', () => ({
-  getPrisma: () => ({ inboxItem: fakes.inboxItem, project: fakes.project, task: fakes.task, job: fakes.job }),
+  getPrisma: () => ({ inboxItem: fakes.inboxItem, project: fakes.project, projectContext: fakes.projectContext, task: fakes.task, job: fakes.job }),
 }))
 vi.mock('../ai/config', () => ({
   getAiProviders: () => ({ llm: { classify: fakes.classify }, stt: { transcribe: fakes.transcribe } }),
@@ -48,6 +49,7 @@ function resetFakes() {
   fakes.inboxItem.findUnique.mockReset()
   fakes.inboxItem.update.mockReset()
   fakes.project.findMany.mockReset()
+  fakes.projectContext.findMany.mockReset().mockResolvedValue([])
   fakes.task.findMany.mockReset()
   fakes.job.create.mockReset()
   fakes.classify.mockReset()
@@ -64,9 +66,9 @@ describe('handler ai.classify', () => {
 
   it('classifica e grava a sugestão com status Aguardando confirmação', async () => {
     fakes.inboxItem.findUnique.mockResolvedValue({ id: 'inbox-1', ownerId: 'user-1', text: 'Planta travando' })
-    fakes.project.findMany.mockResolvedValue([{ name: 'VistaFor', aliases: [], modules: [], tags: [] }])
+    fakes.project.findMany.mockResolvedValue([{ id: 'project-1', name: 'VistaFor', aliases: [], modules: [], tags: [] }])
     fakes.task.findMany.mockResolvedValue([])
-    const suggestion = { project: 'VistaFor', confidence: 90, evidence: ['x'] }
+    const suggestion = { summary: 'x', confidence: 90, evidence: ['x'], actions: [{ id: 'context-1' }] }
     fakes.classify.mockResolvedValue(suggestion)
 
     const handler = resolveHandler('ai.classify')
