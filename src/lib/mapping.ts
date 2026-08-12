@@ -63,6 +63,21 @@ const inboxStatusByDb: Record<string, InboxStatus> = {
   ERROR: 'Com erro',
 }
 
+const inboxStatusByHarness: Record<string, InboxStatus> = {
+  RECEIVED: inboxStatusByDb.RECEIVED,
+  TRANSCRIBING: inboxStatusByDb.TRANSCRIBING,
+  TRANSCRIBED: inboxStatusByDb.ANALYZING,
+  ORGANIZING: inboxStatusByDb.ANALYZING,
+  RETRIEVING_REFERENCES: inboxStatusByDb.ANALYZING,
+  MATERIALIZING: inboxStatusByDb.ANALYZING,
+  EXECUTING: inboxStatusByDb.ANALYZING,
+  AWAITING_MARKDOWN_APPROVAL: inboxStatusByDb.AWAITING_CONFIRMATION,
+  AWAITING_ENTITY_APPROVAL: inboxStatusByDb.AWAITING_CONFIRMATION,
+  FAILED: inboxStatusByDb.ERROR,
+  PROCESSED: inboxStatusByDb.PROCESSED,
+  DISCARDED: inboxStatusByDb.DISCARDED,
+}
+
 const inboxSourceByDb: Record<string, InboxSource> = {
   TEXT: 'Texto',
   AUDIO: 'Áudio',
@@ -151,6 +166,7 @@ export type DbInboxItem = {
   text: string
   suggestion: unknown
   createdAt: string | Date
+  aiRuns?: Array<{ id: string; status?: string }>
 }
 
 export function toDomainTag(tag: DbTag): Tag {
@@ -240,10 +256,11 @@ export function toDomainInbox(item: DbInboxItem): InboxItem {
     id: item.id,
     text: item.text,
     source: inboxSourceByDb[item.source] ?? 'Texto',
-    status: inboxStatusByDb[item.status] ?? 'Recebida',
+    status: inboxStatusByHarness[item.aiRuns?.[0]?.status ?? ''] ?? inboxStatusByDb[item.status] ?? 'Recebida',
     date: formatTimestamp(item.createdAt),
     // O servidor é quem escreve nesse formato (`ai.classify`), então não precisa validar de novo aqui.
     suggestion: (item.suggestion as InboxItem['suggestion'] | null) ?? undefined,
+    harness: Boolean(item.aiRuns?.length),
   }
 }
 

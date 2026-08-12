@@ -8,7 +8,7 @@ describe('configuração da fila', () => {
       runnerToken: null,
       batchSize: 10,
       lockTimeoutMs: 300000,
-      pollIntervalMs: 5000,
+      pollIntervalMs: 1000,
     })
   })
 

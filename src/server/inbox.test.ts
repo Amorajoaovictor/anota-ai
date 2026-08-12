@@ -9,6 +9,7 @@ function fakeStorage(seed: Record<string, Uint8Array> = {}) {
     put: vi.fn(async (key: string, bytes: Uint8Array) => { files[key] = bytes }),
     read: vi.fn(async (key: string) => files[key] ?? null),
     delete: vi.fn(async (key: string) => { delete files[key] }),
+    list: vi.fn(async (prefix: string) => Object.keys(files).filter((key) => key.startsWith(prefix)).map((key) => ({ key, updatedAt: new Date() }))),
   }
 }
 
@@ -18,7 +19,11 @@ describe('caixa de entrada persistida', () => {
 
     await listInboxItems({ inboxItem: { findMany } }, 'user-1')
 
-    expect(findMany).toHaveBeenCalledWith({ where: { ownerId: 'user-1' }, orderBy: { createdAt: 'desc' } })
+    expect(findMany).toHaveBeenCalledWith({
+      where: { ownerId: 'user-1' },
+      orderBy: { createdAt: 'desc' },
+      include: { aiRuns: { select: { id: true, status: true }, orderBy: { createdAt: 'desc' }, take: 1 } },
+    })
   })
 
   it('captura texto e enfileira a classificação', async () => {

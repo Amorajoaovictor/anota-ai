@@ -60,6 +60,28 @@ describe('runner da fila', () => {
     expect(store.jobs.find((job) => job.id === 'job-seguinte')?.status).toBe('DONE')
   })
 
+  /**
+   * H14 protege: timeout aborta chamada externa, nao apenas abandona Promise.
+   * Detecta: Promise.race rejeitando enquanto fetch/STT continua consumindo recurso.
+   * Impacto: cobranca indevida e resultado tardio pode duplicar trabalho.
+   */
+  it('aborta o signal entregue ao handler quando timeout vence', async () => {
+    const store = createFakeJobStore([{ id: 'job-lento', runAt: due, timeoutMs: 10 }])
+    let receivedSignal: AbortSignal | undefined
+    const handler = vi.fn().mockImplementation((_job, context) => {
+      receivedSignal = context.signal
+      return new Promise((_resolve, reject) => {
+        context.signal.addEventListener('abort', () => reject(context.signal.reason), { once: true })
+      })
+    })
+
+    const result = await drainJobs(store, { resolve: () => handler, now, heartbeatIntervalMs: 1_000 })
+
+    expect(result).toMatchObject({ claimed: 1, completed: 0, failed: 1 })
+    expect(receivedSignal?.aborted).toBe(true)
+    expect(store.jobs[0]?.lastError).toBe('Job excedeu timeout de 10 ms.')
+  })
+
   it('não tenta de novo job de tipo desconhecido', async () => {
     const store = createFakeJobStore([{ id: 'job-1', type: 'trello.sync', runAt: due }])
 
@@ -83,6 +105,12 @@ describe('runner da fila', () => {
   it('reconhece só os tipos previstos para as próximas fases', () => {
     expect(isJobType('ai.classify')).toBe(true)
     expect(isJobType('audio.transcribe')).toBe(true)
+    expect(isJobType('ai.organize')).toBe(true)
+    expect(isJobType('ai.retrieve')).toBe(true)
+    expect(isJobType('ai.materialize')).toBe(true)
+    expect(isJobType('ai.execute')).toBe(true)
+    expect(isJobType('ai.cleanup-audio')).toBe(true)
+    expect(isJobType('ai.sweep-audio')).toBe(true)
     expect(isJobType('reminder.dispatch')).toBe(true)
     expect(isJobType('mcp.write')).toBe(false)
     expect(() => resolveHandler('mcp.write')).toThrow(UnknownJobTypeError)

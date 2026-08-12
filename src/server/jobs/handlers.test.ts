@@ -22,11 +22,23 @@ vi.mock('../ai/config', () => ({
   readAiEnvironment: () => ({}),
 }))
 vi.mock('../storage', () => ({
-  getStorage: () => ({ read: fakes.storageRead, delete: fakes.storageDelete, put: vi.fn() }),
+  getStorage: () => ({ read: fakes.storageRead, delete: fakes.storageDelete, put: vi.fn(), list: vi.fn() }),
 }))
 vi.mock('../audit-log', () => ({ recordAuditEvent: fakes.recordAuditEvent }))
 
 import { resolveHandler } from './handlers'
+
+describe('tipos do pipeline v2', () => {
+  /**
+   * Protege: jobs encadeados de retrieval/materializacao possuem handlers reais.
+   * Detecta: fila aceitar tipo que worker trata como desconhecido.
+   * Impacto: run fica preso depois da primeira aprovacao.
+   */
+  it('resolve ai.retrieve e ai.materialize', () => {
+    expect(resolveHandler('ai.retrieve')).toBeTypeOf('function')
+    expect(resolveHandler('ai.materialize')).toBeTypeOf('function')
+  })
+})
 
 function job(overrides: Partial<JobRecord> = {}): JobRecord {
   return {
@@ -41,6 +53,16 @@ function job(overrides: Partial<JobRecord> = {}): JobRecord {
     lockedBy: 'worker-1',
     lastError: null,
     dedupeKey: null,
+    ownerId: null,
+    aiRunId: null,
+    step: null,
+    inputVersion: null,
+    inputHash: null,
+    priority: 0,
+    leaseExpiresAt: null,
+    heartbeatAt: null,
+    timeoutMs: null,
+    cancelledAt: null,
     ...overrides,
   }
 }

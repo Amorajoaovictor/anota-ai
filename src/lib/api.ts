@@ -44,6 +44,14 @@ export function postJson<Result>(url: string, body: unknown) {
   })
 }
 
+export function putJson<Result>(url: string, body: unknown) {
+  return send<Result>(url, {
+    method: 'PUT',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  })
+}
+
 /** Sem header de content-type: o browser define o boundary do multipart sozinho. */
 export function postForm<Result>(url: string, form: FormData) {
   return send<Result>(url, { method: 'POST', body: form })

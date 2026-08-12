@@ -52,4 +52,18 @@ describe('GroqSttProvider', () => {
 
     await expect(provider.transcribe({ bytes: new Uint8Array([1]), contentType: 'audio/webm' })).rejects.toThrow('não devolveu transcrição')
   })
+  /**
+   * H14 protege: cancelamento do worker chega ao fetch do provedor.
+   * Detecta: adapter ignorando AbortSignal recebido do runner.
+   * Impacto: request continua consumindo tempo e credito depois do timeout/descarte.
+   */
+  it('repassa AbortSignal para o fetch', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse({ text: 'ok' }))
+    const provider = new GroqSttProvider({ apiKey: 'gsk-teste', fetchImpl })
+    const controller = new AbortController()
+
+    await provider.transcribe({ bytes: new Uint8Array([1]), contentType: 'audio/webm', signal: controller.signal })
+
+    expect(fetchImpl).toHaveBeenCalledWith(expect.any(String), expect.objectContaining({ signal: controller.signal }))
+  })
 })

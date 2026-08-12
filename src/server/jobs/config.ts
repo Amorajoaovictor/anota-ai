@@ -20,7 +20,7 @@ export function getJobsConfig(environment: Record<string, string | undefined>): 
     runnerToken: runnerToken && runnerToken.length >= 16 ? runnerToken : null,
     batchSize: positiveNumber(environment.JOBS_BATCH_SIZE, 10),
     lockTimeoutMs: positiveNumber(environment.JOBS_LOCK_TIMEOUT_MS, 5 * 60_000),
-    pollIntervalMs: positiveNumber(environment.JOBS_POLL_INTERVAL_MS, 5_000),
+    pollIntervalMs: positiveNumber(environment.JOBS_POLL_INTERVAL_MS, 1_000),
   }
 }
 

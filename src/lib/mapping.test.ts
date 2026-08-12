@@ -237,6 +237,31 @@ describe('tradução entre banco e domínio', () => {
     expect(toDomainInbox(dbInboxItem({ suggestion: null, status: 'RECEIVED' })).suggestion).toBeUndefined()
   })
 
+  /**
+   * Protege: UI identifica run v2 pelo vínculo persistido, não pela ausência de suggestion.
+   * Detecta: item legado pendente entrando por engano na rota /harness.
+   * Impacto: revisão mostra erro 404 em vez do andamento correto do fluxo legado.
+   */
+  it('mapeia presença de AiRun para a UI escolher revisão v2', () => {
+    expect(toDomainInbox(dbInboxItem({ aiRuns: [{ id: 'run-1' }] })).harness).toBe(true)
+    expect(toDomainInbox(dbInboxItem({ aiRuns: [] })).harness).toBe(false)
+  })
+
+  /**
+   * Protege: fila v2 usa estado atual do AiRun, nao status legado congelado.
+   * Detecta: Whisper conclui, mas InboxItem continua TRANSCRIBING e UI espera indefinidamente.
+   * Impacto: usuario nao abre revisao e polling continua sem necessidade.
+   */
+  it('prioriza estado do AiRun sobre InboxItem legado preso em transcricao', () => {
+    const item = toDomainInbox(dbInboxItem({
+      status: 'TRANSCRIBING',
+      suggestion: null,
+      aiRuns: [{ id: 'run-1', status: 'AWAITING_MARKDOWN_APPROVAL' }],
+    }))
+
+    expect(item.status).toBe(toDomainInbox(dbInboxItem()).status)
+  })
+
   it('origem de áudio traduz para o rótulo em português', () => {
     expect(toDomainInbox(dbInboxItem({ source: 'AUDIO' })).source).toBe('Áudio')
   })

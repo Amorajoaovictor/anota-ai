@@ -7,6 +7,10 @@ const fakes = vi.hoisted(() => ({
   inboxFindMany: vi.fn(),
   inboxCreate: vi.fn(),
   jobCreate: vi.fn(),
+  harnessEnabled: false,
+  ownerAllowed: true,
+  isHarnessEnabledForOwner: vi.fn(),
+  captureHarnessText: vi.fn(),
   drainJobs: vi.fn().mockResolvedValue({ claimed: 0, completed: 0, failed: 0, released: 0 }),
 }))
 
@@ -18,6 +22,18 @@ vi.mock('../../../lib/prisma', () => ({
   }),
 }))
 vi.mock('../../../server/jobs/runner', () => ({ drainJobs: fakes.drainJobs }))
+vi.mock('../../../server/ai/harness/config', () => ({
+  readHarnessV2Config: () => ({
+    enabled: fakes.harnessEnabled,
+    ownerAllowlist: [],
+    maxProposalItems: 100,
+    maxMarkdownCharacters: 50_000,
+    maxAudioBytes: 1024,
+    timeouts: { organizationMs: 45_000 },
+  }),
+  isHarnessEnabledForOwner: fakes.isHarnessEnabledForOwner,
+}))
+vi.mock('../../../server/ai/harness/capture', () => ({ captureHarnessText: fakes.captureHarnessText }))
 
 import { GET, POST } from './route'
 
@@ -30,6 +46,15 @@ describe('rotas da caixa de entrada', () => {
     fakes.inboxFindMany.mockReset().mockResolvedValue([{ id: 'inbox-1' }])
     fakes.inboxCreate.mockReset().mockResolvedValue({ id: 'inbox-1', text: 'Ligar para o PAX' })
     fakes.jobCreate.mockReset().mockResolvedValue({ id: 'job-1' })
+    fakes.harnessEnabled = false
+    fakes.ownerAllowed = true
+    fakes.isHarnessEnabledForOwner.mockReset().mockImplementation(() => fakes.harnessEnabled && fakes.ownerAllowed)
+    fakes.captureHarnessText.mockReset().mockResolvedValue({
+      kind: 'created',
+      inboxItem: { id: 'inbox-v2', text: 'Fluxo novo' },
+      aiRun: { id: 'run-1', status: 'TRANSCRIBED' },
+      transcript: { id: 'transcript-1' },
+    })
     fakes.drainJobs.mockClear()
   })
 
@@ -46,7 +71,11 @@ describe('rotas da caixa de entrada', () => {
 
     expect(response.status).toBe(200)
     await expect(response.json()).resolves.toEqual({ inbox: [{ id: 'inbox-1' }] })
-    expect(fakes.inboxFindMany).toHaveBeenCalledWith({ where: { ownerId: 'user-1' }, orderBy: { createdAt: 'desc' } })
+    expect(fakes.inboxFindMany).toHaveBeenCalledWith({
+      where: { ownerId: 'user-1' },
+      orderBy: { createdAt: 'desc' },
+      include: { aiRuns: { select: { id: true, status: true }, orderBy: { createdAt: 'desc' }, take: 1 } },
+    })
   })
 
   it('responde 400 para texto vazio, sem gravar nem enfileirar', async () => {
@@ -74,5 +103,41 @@ describe('rotas da caixa de entrada', () => {
     const response = await post({ text: 'Ligar para o PAX' })
 
     expect(response.status).toBe(201)
+  })
+
+  /**
+   * Protege: flag habilitada direciona nova captura ao harness sem ai.classify e marca a resposta como v2.
+   * Detecta: front v2 alimentado pelo fluxo legado ou recebendo item sem vínculo para abrir revisão correta.
+   * Impacto: criação sem dois checkpoints humanos ou erro falso ao abrir processamento.
+   */
+  it('usa captura versionada quando feature flag v2 esta habilitada', async () => {
+    fakes.harnessEnabled = true
+
+    const response = await post({ text: 'Fluxo novo' })
+
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toEqual({
+      inboxItem: { id: 'inbox-v2', text: 'Fluxo novo', aiRuns: [{ id: 'run-1' }] },
+      aiRun: { id: 'run-1', status: 'TRANSCRIBED' },
+    })
+    expect(fakes.captureHarnessText).toHaveBeenCalledWith(expect.anything(), 'user-1', { text: 'Fluxo novo' }, expect.anything())
+    expect(fakes.isHarnessEnabledForOwner).toHaveBeenCalledWith(expect.anything(), 'user-1')
+    expect(fakes.jobCreate).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Protege: flag global nao inclui owner fora da allowlist.
+   * Detecta: rota consultando apenas config.enabled.
+   * Impacto: rollout atinge conta nao aprovada.
+   */
+  it('mantem fluxo legado para owner fora da allowlist', async () => {
+    fakes.harnessEnabled = true
+    fakes.ownerAllowed = false
+
+    const response = await post({ text: 'Ainda legado' })
+
+    expect(response.status).toBe(201)
+    expect(fakes.captureHarnessText).not.toHaveBeenCalled()
+    expect(fakes.jobCreate).toHaveBeenCalled()
   })
 })

@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getPrisma } from '../../../lib/prisma'
+import { captureHarnessText } from '../../../server/ai/harness/capture'
+import { isHarnessEnabledForOwner, readHarnessV2Config } from '../../../server/ai/harness/config'
 import { captureInboxText, listInboxItems } from '../../../server/inbox'
-import { readJsonBody, ValidationError } from '../../../server/http'
+import { PayloadTooLargeError, readJsonBody, ValidationError } from '../../../server/http'
 import { drainJobs } from '../../../server/jobs/runner'
 import { withOwner } from '../../../server/with-owner'
 
@@ -14,6 +16,23 @@ export const GET = withOwner(async ({ ownerId }) => {
 
 export const POST = withOwner(async ({ ownerId, request }) => {
   const input = await readJsonBody(request)
+  const harnessConfig = readHarnessV2Config(process.env)
+  if (isHarnessEnabledForOwner(harnessConfig, ownerId)) {
+    const result = await captureHarnessText(getPrisma() as any, ownerId, input, {
+      maxCharacters: harnessConfig.maxMarkdownCharacters,
+      organizationTimeoutMs: harnessConfig.timeouts.organizationMs,
+      // Contagem conservadora central: nunca subestima caracteres multibyte.
+      countTokens: (text) => Array.from(text).length,
+    })
+    if (result.kind === 'invalid') throw new ValidationError('Dados invalidos.', result.issues)
+    if (result.kind === 'too-large') throw new PayloadTooLargeError('Texto acima do limite do harness.')
+    triggerInlineDrain()
+    return NextResponse.json({
+      inboxItem: { ...result.inboxItem, aiRuns: [{ id: result.aiRun.id }] },
+      aiRun: result.aiRun,
+    }, { status: 201 })
+  }
+
   const result = await captureInboxText(getPrisma(), ownerId, input)
 
   if (result.kind === 'invalid') throw new ValidationError('Dados inválidos.', result.issues)

@@ -31,6 +31,22 @@ describe('armazenamento local de anexos', () => {
     await expect(createLocalStorage(root).read('user-1/ausente')).resolves.toBeNull()
   })
 
+  /**
+   * H16 protege: sweeper consegue enumerar objetos pelo prefixo sem expor caminho absoluto.
+   * Detecta: driver local sem contrato de listagem dos temporarios.
+   * Impacto: audio orfao nunca entra na politica de 24 horas.
+   */
+  it('lista objetos seguros por prefixo com data tecnica', async () => {
+    const storage = createLocalStorage(root)
+    await storage.put('inbox-audio/user-1/a', new Uint8Array([1]))
+    await storage.put('attachments/user-1/b', new Uint8Array([2]))
+
+    const entries = await storage.list('inbox-audio/')
+
+    expect(entries).toHaveLength(1)
+    expect(entries[0]).toMatchObject({ key: 'inbox-audio/user-1/a', updatedAt: expect.any(Date) })
+  })
+
   it('recusa chave que tenta escapar do diretório', async () => {
     const storage = createLocalStorage(root)
 

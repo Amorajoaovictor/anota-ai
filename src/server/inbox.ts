@@ -69,6 +69,7 @@ export function listInboxItems(repository: InboxListRepository, ownerId: string)
   return repository.inboxItem.findMany({
     where: { ownerId },
     orderBy: { createdAt: 'desc' },
+    include: { aiRuns: { select: { id: true, status: true }, orderBy: { createdAt: 'desc' }, take: 1 } },
   })
 }
 

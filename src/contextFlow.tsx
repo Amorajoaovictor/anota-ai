@@ -7,6 +7,7 @@ import {
   MagicWand,
   Microphone,
   PaperPlaneTilt,
+  SpinnerGap,
   Sparkle,
   Trash,
   WarningCircle,
@@ -22,6 +23,7 @@ import {
   type InboxItem,
   type Priority,
 } from './domain'
+import { HarnessReviewPanel } from './aiHarnessFlow'
 import type { ProjectActions } from './lib/store'
 import type { AiPlan, AiPlanAction } from './server/ai/plan'
 import { Button, EmptyState, PageHeading, type BadgeTone, type Notify } from './ui'
@@ -89,20 +91,22 @@ export function SmartInboxView(props: ContextFlowProps) {
   const [text, setText] = useState('')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const recorder = useAudioRecorder((blob) => { void actions.captureInboxAudio(blob) })
+  const recorder = useAudioRecorder((blob) => {
+    void actions.captureInboxAudio(blob).then((id) => { if (id) setSelectedId(id) })
+  })
   useInboxPolling(state, actions)
 
   const selected = state.inbox.find((item) => item.id === selectedId)
   const active = state.inbox.filter((item) => item.status !== 'Descartada')
 
-  if (selected?.suggestion) {
+  if (selected) {
     return <ContextReviewPanel {...props} item={selected} onBack={() => setSelectedId(null)} />
   }
 
   function captureAndAnalyze() {
     const clean = text.trim()
     if (!clean) return
-    void actions.captureInbox(clean)
+    void actions.captureInbox(clean).then((id) => { if (id) setSelectedId(id) })
     setText('')
   }
 
@@ -113,7 +117,7 @@ export function SmartInboxView(props: ContextFlowProps) {
 
   function pickFile(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
-    if (file) void actions.captureInboxAudio(file)
+    if (file) void actions.captureInboxAudio(file).then((id) => { if (id) setSelectedId(id) })
     event.target.value = ''
   }
 
@@ -121,9 +125,9 @@ export function SmartInboxView(props: ContextFlowProps) {
     <PageHeading
       level="section"
       className="context-heading"
-      eyebrow="ENTRADAS E CONTEXTO"
+      eyebrow="CAPTURA SUPERVISIONADA"
       title="Caixa de entrada inteligente"
-      subtitle="Registre do seu jeito. O agente encontra projeto, módulo e próxima ação."
+      subtitle="Registre em texto ou áudio. Você revisa o resultado e confirma antes de qualquer criação."
     />
 
     <section className="capture-hub view-panel">
@@ -131,7 +135,7 @@ export function SmartInboxView(props: ContextFlowProps) {
         <Sparkle size={22} weight="duotone" />
         <div>
           <strong>O que aconteceu?</strong>
-          <span>Descreva uma demanda, decisão, bloqueio ou ideia sem preencher formulário.</span>
+          <span>Descreva uma demanda, reunião, decisão, bloqueio ou ideia sem preencher formulário.</span>
         </div>
       </div>
       <textarea
@@ -149,7 +153,7 @@ export function SmartInboxView(props: ContextFlowProps) {
           <input ref={fileInputRef} type="file" accept="audio/*" hidden onChange={pickFile} />
         </div>
         <Button variant="primary" className="capture-submit" disabled={!text.trim()} onClick={captureAndAnalyze} trailing={<PaperPlaneTilt size={17} weight="fill" />}>
-          Analisar contexto
+          Organizar com IA
         </Button>
       </div>
     </section>
@@ -172,7 +176,9 @@ export function ContextReviewQueue(props: ContextFlowProps) {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   useInboxPolling(state, actions)
 
-  const pending = state.inbox.filter((item) => item.status === 'Aguardando confirmação' && item.suggestion)
+  const pending = state.inbox.filter((item) => item.status === 'Aguardando confirmação' || (
+    !item.suggestion && item.status !== 'Processada' && item.status !== 'Descartada'
+  ))
   const selected = pending.find((item) => item.id === selectedId)
 
   if (selected) {
@@ -183,18 +189,18 @@ export function ContextReviewQueue(props: ContextFlowProps) {
     <PageHeading
       level="section"
       className="context-heading"
-      eyebrow="APROVAÇÃO HUMANA"
-      title="Revisão contextual"
-      subtitle="Confira evidências e corrija a proposta antes de criar ou atualizar qualquer card."
+      eyebrow="REVISÃO IA"
+      title="Revisão IA"
+      subtitle="Revise conteúdo e itens propostos nesta fila antes de criar entidades."
     />
     <div className="review-overview view-panel">
       <div className="review-score"><MagicWand size={27} weight="duotone" /><div><strong>{pending.length} propostas</strong><span>aguardando decisão</span></div></div>
-      <p>Nenhuma alteração acontece sem sua aprovação. Correções ajudam o agente a entender melhor cada projeto.</p>
+      <p>Nenhuma entidade é criada antes da sua confirmação final. Estado e correções permanecem após recarregar.</p>
     </div>
     <section className="context-list review-list">
       {pending.length
         ? pending.map((item) => <InboxCard key={item.id} item={item} onOpen={() => setSelectedId(item.id)} />)
-        : <EmptyState icon={<CheckCircle size={34} weight="duotone" />} title="Revisão em dia" description="Novas classificações aparecerão aqui." />}
+        : <EmptyState icon={<CheckCircle size={34} weight="duotone" />} title="Revisão em dia" description="Novos Markdown e previews aparecerão aqui." />}
     </section>
   </div>
 }
@@ -225,17 +231,33 @@ function InboxCard({ item, onOpen }: { item: InboxItem; onOpen: () => void }) {
           <Confidence value={suggestion.confidence} />
         </div>)}
     </div>
-    <button className="review-button" disabled={processed || pending || errored} onClick={onOpen}>
-      {processed ? 'Plano executado' : errored ? 'Falhou' : pending ? 'Processando…' : 'Revisar proposta'}
+    <button className="review-button" disabled={processed} onClick={onOpen}>
+      {processed ? 'Plano executado' : errored ? 'Ver erro' : pending ? 'Ver andamento' : suggestion ? 'Revisar proposta' : 'Abrir revisão'}
       {processed ? <CheckCircle size={16} weight="fill" /> : <MagicWand size={16} />}
     </button>
   </article>
 }
 
 function ContextReviewPanel(props: ContextFlowProps & { item: InboxItem; onBack: () => void }) {
+  if (props.item.harness) {
+    return <HarnessReviewPanel inboxItem={props.item} projects={props.state.projects} notify={props.notify} onBack={props.onBack} />
+  }
+  if (!props.item.suggestion) return <LegacyPendingInboxPanel item={props.item} onBack={props.onBack} />
   return isAiPlanSuggestion(props.item.suggestion)
     ? <AiPlanReviewPanel {...props} plan={props.item.suggestion} />
     : <LegacyContextReviewPanel {...props} />
+}
+
+function LegacyPendingInboxPanel({ item, onBack }: { item: InboxItem; onBack: () => void }) {
+  const failed = item.status === 'Com erro'
+  return <div className="context-page harness-page">
+    <button className="back-context" onClick={onBack}><ArrowLeft size={17} /> Voltar para fila</button>
+    <section className={`harness-status-page ${failed ? 'error' : 'processing'}`}>
+      {failed ? <WarningCircle size={35} /> : <SpinnerGap className="harness-spinner" size={35} />}
+      <h1>{failed ? 'Falha ao processar entrada' : 'Processando entrada'}</h1>
+      <p>{failed ? 'A IA não concluiu esta entrada. Volte à fila e envie novamente se necessário.' : 'Classificação em andamento. Esta tela será atualizada automaticamente na fila.'}</p>
+    </section>
+  </div>
 }
 
 function LegacyContextReviewPanel({ state, actions, notify, item, onBack }: ContextFlowProps & { item: InboxItem; onBack: () => void }) {
@@ -333,7 +355,6 @@ function LegacyContextReviewPanel({ state, actions, notify, item, onBack }: Cont
 function AiPlanReviewPanel({ actions, notify, item, onBack, plan }: ContextFlowProps & { item: InboxItem; onBack: () => void; plan: AiPlan }) {
   const [draft, setDraft] = useState(plan)
   const [selected, setSelected] = useState(() => new Set(plan.actions.map((action) => action.id)))
-  const [stage, setStage] = useState<'extraction' | 'review'>('extraction')
 
   function toggle(actionId: string) {
     setSelected((current) => {
@@ -395,22 +416,8 @@ function AiPlanReviewPanel({ actions, notify, item, onBack, plan }: ContextFlowP
     onBack()
   }
 
-  if (stage === 'extraction') {
-    return <AiExtractionPanel
-      item={item}
-      draft={draft}
-      onBack={onBack}
-      onDiscard={discard}
-      onContinue={() => setStage('review')}
-      onPatchSummary={(summary) => setDraft((current) => ({ ...current, summary }))}
-      onPatchTask={patchTask}
-      onPatchContext={patchContext}
-    />
-  }
-
   return <div className="context-page">
-    <button className="back-context" onClick={() => setStage('extraction')}><ArrowLeft size={17} /> Voltar às informações</button>
-    <AiFlowSteps active={3} />
+    <button className="back-context" onClick={onBack}><ArrowLeft size={17} /> Voltar para fila</button>
     <PageHeading
       level="section"
       className="context-heading"
@@ -435,14 +442,33 @@ function AiPlanReviewPanel({ actions, notify, item, onBack, plan }: ContextFlowP
             <input type="checkbox" checked={selected.has(action.id)} onChange={() => toggle(action.id)} />
             {entityLabel(action.entity)} · confiança {action.confidence}%
           </label>
-          {action.entity === 'context'
-            ? <>
-              <label>Título<input value={action.data.title} onChange={(event) => patchContext(action.id, { title: event.target.value })} /></label>
-              <label>Conteúdo<textarea value={action.data.content} onChange={(event) => patchContext(action.id, { content: event.target.value })} /></label>
-              <small>{action.data.category}</small>
-            </>
-            : <p>{actionDescription(action)}</p>}
-          <div className="evidence-list">{action.evidence.map((evidence) => <div key={evidence}><CheckCircle size={14} /><span>{evidence}</span></div>)}</div>
+          {action.entity === 'task' && <>
+            <label>Título da tarefa<input value={action.data.title} onChange={(event) => patchTask(action.id, { title: event.target.value })} /></label>
+            <label>Informações úteis<textarea value={action.data.description ?? ''} onChange={(event) => patchTask(action.id, { description: event.target.value })} /></label>
+            <div className="form-pair">
+              <label>Prazo citado<input type="date" value={dateInputValue(action.data.dueAt)} onChange={(event) => patchTask(action.id, { dueAt: event.target.value ? `${event.target.value}T00:00:00.000Z` : null })} /></label>
+              <label>Complexidade percebida<select value={action.data.complexity ?? ''} onChange={(event) => patchTask(action.id, { complexity: event.target.value ? Number(event.target.value) : null })}>
+                <option value="">Não informada</option><option value="1">Baixa</option><option value="2">Média</option><option value="3">Alta</option>
+              </select></label>
+            </div>
+            <div className="form-pair">
+              <label>Prioridade<select value={action.data.priority ?? ''} onChange={(event) => patchTask(action.id, { priority: (event.target.value || undefined) as TaskPlanAction['data']['priority'] })}>
+                <option value="">Não informada</option>{priorities.map((priority) => <option key={priority}>{priority}</option>)}
+              </select></label>
+              <label>Módulo<input value={action.data.moduleName ?? ''} onChange={(event) => patchTask(action.id, { moduleName: event.target.value })} /></label>
+            </div>
+          </>}
+          {action.entity === 'context' && <>
+            <div className="form-pair">
+              <label>Tipo de contexto<select value={action.data.category} onChange={(event) => patchContext(action.id, { category: event.target.value as ContextPlanAction['data']['category'] })}>
+                <option value="FACT">Fato</option><option value="DECISION">Decisão</option><option value="RULE">Regra</option><option value="VOCABULARY">Vocabulário</option><option value="MEETING">Reunião</option>
+              </select></label>
+              <label>Título do contexto<input value={action.data.title} onChange={(event) => patchContext(action.id, { title: event.target.value })} /></label>
+            </div>
+            <label>Informação para contexto<textarea value={action.data.content} onChange={(event) => patchContext(action.id, { content: event.target.value })} /></label>
+          </>}
+          {action.entity !== 'task' && action.entity !== 'context' && <p>{actionDescription(action)}</p>}
+          <ActionEvidence action={action} />
         </article>)}
       </section>
     </div>
@@ -457,106 +483,6 @@ function AiPlanReviewPanel({ actions, notify, item, onBack, plan }: ContextFlowP
 
 type TaskPlanAction = Extract<AiPlanAction, { entity: 'task' }>
 type ContextPlanAction = Extract<AiPlanAction, { entity: 'context' }>
-
-function AiExtractionPanel({ item, draft, onBack, onDiscard, onContinue, onPatchSummary, onPatchTask, onPatchContext }: {
-  item: InboxItem
-  draft: AiPlan
-  onBack: () => void
-  onDiscard: () => void
-  onContinue: () => void
-  onPatchSummary: (summary: string) => void
-  onPatchTask: (actionId: string, patch: Partial<TaskPlanAction['data']>) => void
-  onPatchContext: (actionId: string, patch: Partial<ContextPlanAction['data']>) => void
-}) {
-  const tasks = draft.actions.filter((action): action is TaskPlanAction => action.entity === 'task')
-  const contexts = draft.actions.filter((action): action is ContextPlanAction => action.entity === 'context')
-  const others = draft.actions.filter((action) => action.entity !== 'task' && action.entity !== 'context')
-
-  return <div className="context-page">
-    <button className="back-context" onClick={onBack}><ArrowLeft size={17} /> Voltar para fila</button>
-    <AiFlowSteps active={2} />
-    <PageHeading
-      level="section"
-      className="context-heading"
-      eyebrow="ETAPA 2 DE 3"
-      title="Informações extraídas"
-      subtitle="Confira o que a IA entendeu do áudio. Corrija prazo, complexidade e fatos antes de montar a proposta final."
-      action={<Confidence value={draft.confidence} large />}
-    />
-
-    <div className="extraction-layout">
-      <section className="review-column original-entry extraction-transcript">
-        <ColumnTitle icon={<FileAudio size={19} />} title="1. Transcrição" />
-        <p>{item.text}</p>
-        <div className="origin-meta"><span>{item.source}</span><span>{item.date}</span></div>
-        <label className="extraction-summary">Resumo útil<textarea value={draft.summary} onChange={(event) => onPatchSummary(event.target.value)} /></label>
-        <div className="evidence-list">{draft.evidence.map((evidence) => <div key={evidence}><CheckCircle size={16} weight="fill" /><span>{evidence}</span></div>)}</div>
-      </section>
-
-      <section className="extracted-information">
-        {tasks.length > 0 && <div className="extracted-group">
-          <header><strong>Tarefas identificadas</strong><span>{tasks.length}</span></header>
-          {tasks.map((action) => <article className="extracted-card" key={action.id}>
-            <div className="extracted-card-heading"><b>Tarefa</b><Confidence value={action.confidence} /></div>
-            <label>Título da tarefa<input value={action.data.title} onChange={(event) => onPatchTask(action.id, { title: event.target.value })} /></label>
-            <label>Informações úteis<textarea value={action.data.description ?? ''} onChange={(event) => onPatchTask(action.id, { description: event.target.value })} /></label>
-            <div className="form-pair">
-              <label>Prazo citado<input type="date" value={dateInputValue(action.data.dueAt)} onChange={(event) => onPatchTask(action.id, { dueAt: event.target.value ? `${event.target.value}T00:00:00.000Z` : null })} /></label>
-              <label>Complexidade percebida<select value={action.data.complexity ?? ''} onChange={(event) => onPatchTask(action.id, { complexity: event.target.value ? Number(event.target.value) : null })}>
-                <option value="">Não informada</option><option value="1">Baixa</option><option value="2">Média</option><option value="3">Alta</option>
-              </select></label>
-            </div>
-            <div className="form-pair">
-              <label>Prioridade<select value={action.data.priority ?? ''} onChange={(event) => onPatchTask(action.id, { priority: (event.target.value || undefined) as TaskPlanAction['data']['priority'] })}>
-                <option value="">Não informada</option>{priorities.map((priority) => <option key={priority}>{priority}</option>)}
-              </select></label>
-              <label>Módulo<input value={action.data.moduleName ?? ''} onChange={(event) => onPatchTask(action.id, { moduleName: event.target.value })} /></label>
-            </div>
-            <ActionEvidence action={action} />
-          </article>)}
-        </div>}
-
-        {contexts.length > 0 && <div className="extracted-group">
-          <header><strong>Contextos identificados</strong><span>{contexts.length}</span></header>
-          {contexts.map((action) => <article className="extracted-card context-extracted-card" key={action.id}>
-            <div className="extracted-card-heading"><b>Contexto independente</b><Confidence value={action.confidence} /></div>
-            <div className="form-pair">
-              <label>Tipo de contexto<select value={action.data.category} onChange={(event) => onPatchContext(action.id, { category: event.target.value as ContextPlanAction['data']['category'] })}>
-                <option value="FACT">Fato</option><option value="DECISION">Decisão</option><option value="RULE">Regra</option><option value="VOCABULARY">Vocabulário</option><option value="MEETING">Reunião</option>
-              </select></label>
-              <label>Título do contexto<input value={action.data.title} onChange={(event) => onPatchContext(action.id, { title: event.target.value })} /></label>
-            </div>
-            <label>Informação para contexto<textarea value={action.data.content} onChange={(event) => onPatchContext(action.id, { content: event.target.value })} /></label>
-            <ActionEvidence action={action} />
-          </article>)}
-        </div>}
-
-        {others.length > 0 && <div className="extracted-group">
-          <header><strong>Outras informações</strong><span>{others.length}</span></header>
-          {others.map((action) => <article className="extracted-card compact" key={action.id}>
-            <div className="extracted-card-heading"><b>{entityLabel(action.entity)}</b><Confidence value={action.confidence} /></div>
-            <p>{actionDescription(action)}</p>
-            <ActionEvidence action={action} />
-          </article>)}
-        </div>}
-      </section>
-    </div>
-
-    <footer className="review-footer">
-      <button className="discard-button" onClick={onDiscard}><Trash size={17} /> Descartar entrada</button>
-      <span>{tasks.length} tarefas · {contexts.length} contextos · {others.length} outras informações</span>
-      <Button variant="primary" className="confirm-context" trailing={<MagicWand size={18} />} onClick={onContinue}>Transformar em proposta</Button>
-    </footer>
-  </div>
-}
-
-function AiFlowSteps({ active }: { active: 2 | 3 }) {
-  return <ol className="ai-flow-steps" aria-label="Etapas do processamento">
-    <li className="complete"><span>1</span><div><strong>Transcrição</strong><small>Áudio convertido em texto</small></div></li>
-    <li className={active === 2 ? 'active' : 'complete'}><span>2</span><div><strong>Informações</strong><small>Fatos e campos úteis</small></div></li>
-    <li className={active === 3 ? 'active' : ''}><span>3</span><div><strong>Proposta final</strong><small>Revisar e aprovar</small></div></li>
-  </ol>
-}
 
 function ActionEvidence({ action }: { action: AiPlanAction }) {
   return <div className="extracted-evidence"><small>EVIDÊNCIA</small>{action.evidence.map((evidence) => <span key={evidence}>{evidence}</span>)}</div>

@@ -30,6 +30,7 @@ export class GroqSttProvider implements SttProvider {
       method: 'POST',
       headers: { authorization: `Bearer ${this.apiKey}` },
       body: form,
+      signal: input.signal,
     })
 
     if (!response.ok) {

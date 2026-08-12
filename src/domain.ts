@@ -119,6 +119,8 @@ export type InboxItem = {
   status: InboxStatus
   date: string
   suggestion?: ContextSuggestion | AiPlan
+  /** Indica vínculo persistido com AiRun v2; ausência de suggestion não é suficiente. */
+  harness?: boolean
 }
 /**
  * Status em que o item ainda depende de um job rodar (`ai.classify`/`audio.transcribe`).

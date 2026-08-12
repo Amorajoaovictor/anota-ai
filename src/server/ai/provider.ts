@@ -43,7 +43,7 @@ export type LlmProvider = {
   classify(input: ClassificationInput): Promise<ClassificationResult>
 }
 
-export type SttInput = { bytes: Uint8Array; contentType: string }
+export type SttInput = { bytes: Uint8Array; contentType: string; signal?: AbortSignal }
 export type SttResult = { text: string }
 
 export type SttProvider = {

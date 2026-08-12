@@ -80,6 +80,71 @@ enum JobStatus {
   FAILED
 }
 
+enum AiRunStatus {
+  RECEIVED
+  TRANSCRIBING
+  TRANSCRIBED
+  ORGANIZING
+  AWAITING_MARKDOWN_APPROVAL
+  RETRIEVING_REFERENCES
+  MATERIALIZING
+  AWAITING_ENTITY_APPROVAL
+  EXECUTING
+  PROCESSED
+  FAILED
+  DISCARDED
+}
+
+enum AiRunStep {
+  TRANSCRIBING
+  ORGANIZING
+  RETRIEVING_REFERENCES
+  MATERIALIZING
+  EXECUTING
+  CLEANING_AUDIO
+}
+
+enum TranscriptSource {
+  TEXT
+  STT
+}
+
+enum AiRevisionSource {
+  AI
+  USER
+}
+
+enum AiApprovalType {
+  MARKDOWN
+  ENTITIES
+}
+
+enum AiExecutionStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum ProposalOperation {
+  CREATE
+  LINK
+}
+
+enum ProposalEntityType {
+  TASK
+  MEETING
+  NOTE
+  MILESTONE
+  PROJECT
+  ALIAS
+  MODULE
+  TAG
+  CONTEXT
+  DEPENDENCY
+  TASK_MILESTONE
+}
+
 model Project {
   id          String          @id @default(cuid())
   ownerId     String
@@ -95,6 +160,7 @@ model Project {
   notes       Note[]
   tasks       Task[]
   milestones  Milestone[]
+  meetings    Meeting[]
   attachments Attachment[]
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
@@ -253,6 +319,7 @@ model InboxItem {
   text        String
   suggestion  Json?
   createdTask Task?       @relation("InboxTask")
+  aiRuns      AiRun[]
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 
@@ -284,10 +351,252 @@ model Job {
   lockedBy    String?
   lastError   String?
   dedupeKey   String?   @unique
+  ownerId     String?
+  aiRunId     String?
+  aiRun       AiRun?    @relation(fields: [aiRunId], references: [id], onDelete: SetNull)
+  step        AiRunStep?
+  inputVersion Int?
+  inputHash   String?
+  priority    Int       @default(0)
+  leaseExpiresAt DateTime?
+  heartbeatAt DateTime?
+  timeoutMs   Int?
+  cancelledAt DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 
   @@index([status, runAt])
+  @@index([aiRunId])
+  @@index([status, priority, runAt])
+}
+
+model Meeting {
+  id              String   @id @default(cuid())
+  ownerId         String
+  projectId       String?
+  project         Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  title           String
+  description     String   @default("")
+  startsAt        DateTime
+  endsAt          DateTime?
+  durationMinutes Int?
+  timezone        String
+  link            String?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([ownerId, startsAt])
+  @@index([projectId])
+}
+
+model AiRun {
+  id                       String                   @id @default(cuid())
+  ownerId                  String
+  inboxItemId              String
+  inboxItem                InboxItem                @relation(fields: [inboxItemId], references: [id], onDelete: Cascade)
+  status                   AiRunStatus              @default(RECEIVED)
+  version                  Int                      @default(0)
+  failedStep               AiRunStep?
+  errorCode                String?
+  retryable                Boolean                  @default(false)
+  activeTranscriptId       String?
+  activeMarkdownRevisionId String?
+  activeProposalRevisionId String?
+  transcripts              TranscriptRevision[]
+  markdownRevisions        MarkdownRevision[]
+  retrievalSnapshots       RetrievalSnapshot[]
+  proposalRevisions        ProposalRevision[]
+  approvals                AiApproval[]
+  executions               AiExecution[]
+  attempts                 AiCallAttempt[]
+  jobs                     Job[]
+  createdAt                DateTime                 @default(now())
+  updatedAt                DateTime                 @updatedAt
+  discardedAt              DateTime?
+  processedAt              DateTime?
+
+  @@index([ownerId, createdAt])
+  @@index([status, updatedAt])
+  @@index([inboxItemId, createdAt])
+}
+
+model TranscriptRevision {
+  id              String           @id @default(cuid())
+  aiRunId         String
+  aiRun           AiRun            @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  version         Int
+  text            String
+  contentHash     String
+  source          TranscriptSource
+  provider        String?
+  model           String?
+  language        String?
+  durationMs      Int?
+  inputBytes      Int
+  tokenCount      Int
+  speakerSegments Json?
+  timestamps      Json?
+  createdAt       DateTime         @default(now())
+
+  @@unique([aiRunId, version])
+}
+
+model MarkdownRevision {
+  id               String             @id @default(cuid())
+  aiRunId          String
+  aiRun            AiRun              @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  version          Int
+  parentRevisionId String?
+  parentRevision   MarkdownRevision?  @relation("MarkdownRevisionParent", fields: [parentRevisionId], references: [id], onDelete: SetNull)
+  childRevisions   MarkdownRevision[] @relation("MarkdownRevisionParent")
+  source           AiRevisionSource
+  content          String
+  contentHash      String
+  tokenCount       Int
+  topics           Json               @default("[]")
+  promptVersion    String?
+  model            String?
+  approvedAt       DateTime?
+  retrievalSnapshots RetrievalSnapshot[]
+  proposalRevisions ProposalRevision[]
+  createdAt        DateTime           @default(now())
+
+  @@unique([aiRunId, version])
+}
+
+model RetrievalSnapshot {
+  id                 String             @id @default(cuid())
+  aiRunId            String
+  aiRun              AiRun              @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  markdownRevisionId String
+  markdownRevision   MarkdownRevision   @relation(fields: [markdownRevisionId], references: [id], onDelete: Cascade)
+  queryVersion       String
+  contentHash        String
+  candidates         Json
+  proposalRevisions  ProposalRevision[]
+  createdAt          DateTime           @default(now())
+
+  @@index([aiRunId, createdAt])
+  @@index([markdownRevisionId])
+}
+
+model ProposalRevision {
+  id                  String             @id @default(cuid())
+  aiRunId             String
+  aiRun               AiRun              @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  markdownRevisionId  String
+  markdownRevision    MarkdownRevision   @relation(fields: [markdownRevisionId], references: [id], onDelete: Cascade)
+  retrievalSnapshotId String
+  retrievalSnapshot   RetrievalSnapshot @relation(fields: [retrievalSnapshotId], references: [id], onDelete: Cascade)
+  version             Int
+  parentRevisionId    String?
+  parentRevision      ProposalRevision?  @relation("ProposalRevisionParent", fields: [parentRevisionId], references: [id], onDelete: SetNull)
+  childRevisions      ProposalRevision[] @relation("ProposalRevisionParent")
+  source              AiRevisionSource
+  schemaVersion       Int
+  rawOutput           Json?
+  validatedPlan       Json
+  contentHash         String
+  promptVersion       String?
+  provider            String?
+  model               String?
+  inputTokens         Int?
+  outputTokens        Int?
+  latencyMs           Int?
+  approvedAt          DateTime?
+  items               ProposalItem[]
+  execution           AiExecution?
+  createdAt           DateTime           @default(now())
+
+  @@unique([aiRunId, version])
+  @@index([markdownRevisionId])
+  @@index([retrievalSnapshotId])
+}
+
+model ProposalItem {
+  id                    String             @id @default(cuid())
+  proposalRevisionId    String
+  proposalRevision      ProposalRevision   @relation(fields: [proposalRevisionId], references: [id], onDelete: Cascade)
+  localKey              String
+  entityType            ProposalEntityType
+  operation             ProposalOperation
+  payload               Json
+  dependsOn             String[]           @default([])
+  evidence              Json
+  confidence            Json
+  duplicateCandidates   Json
+  selected              Boolean            @default(true)
+  userEdited            Boolean            @default(false)
+  origins               EntityOrigin[]
+  createdAt             DateTime           @default(now())
+
+  @@unique([proposalRevisionId, localKey])
+}
+
+model AiApproval {
+  id         String         @id @default(cuid())
+  aiRunId    String
+  aiRun      AiRun          @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  ownerId    String
+  type       AiApprovalType
+  targetId   String
+  targetHash String
+  createdAt  DateTime       @default(now())
+
+  @@unique([type, targetId])
+  @@index([ownerId, createdAt])
+  @@index([aiRunId])
+}
+
+model AiExecution {
+  id                 String            @id @default(cuid())
+  aiRunId            String
+  aiRun              AiRun             @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  proposalRevisionId String            @unique
+  proposalRevision   ProposalRevision  @relation(fields: [proposalRevisionId], references: [id], onDelete: Cascade)
+  status             AiExecutionStatus @default(PENDING)
+  idempotencyKey    String             @unique
+  startedAt          DateTime?
+  completedAt        DateTime?
+  errorCode          String?
+  createdAt          DateTime          @default(now())
+
+  @@index([aiRunId, createdAt])
+}
+
+model EntityOrigin {
+  id             String             @id @default(cuid())
+  proposalItemId String
+  proposalItem   ProposalItem       @relation(fields: [proposalItemId], references: [id], onDelete: Cascade)
+  entityType     ProposalEntityType
+  entityId       String
+  createdAt      DateTime           @default(now())
+
+  @@unique([entityType, entityId])
+  @@index([proposalItemId])
+}
+
+model AiCallAttempt {
+  id                String    @id @default(cuid())
+  aiRunId           String
+  aiRun             AiRun     @relation(fields: [aiRunId], references: [id], onDelete: Cascade)
+  step              AiRunStep
+  attempt           Int
+  provider          String
+  model             String
+  promptVersion     String?
+  inputHash         String
+  providerRequestId String?
+  inputTokens       Int?
+  outputTokens      Int?
+  latencyMs         Int?
+  estimatedCost     Decimal?  @db.Decimal(14, 6)
+  technicalResult   String
+  errorCode         String?
+  createdAt         DateTime  @default(now())
+
+  @@unique([aiRunId, step, attempt])
+  @@index([aiRunId, createdAt])
 }
 
 model AuditLog {

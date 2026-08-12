@@ -37,6 +37,12 @@ export class PayloadTooLargeError extends HttpError {
   }
 }
 
+export class UnprocessableEntityError extends HttpError {
+  constructor(message = 'Conteudo semanticamente inconsistente.', issues?: string[]) {
+    super(422, message, issues)
+  }
+}
+
 export function toErrorResponse(error: unknown) {
   if (error instanceof HttpError) {
     return NextResponse.json(

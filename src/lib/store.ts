@@ -106,12 +106,12 @@ export function useProjectData(initial: AppState, notify: Notify) {
 
   const setState = useCallback((next: AppState) => commit(next), [commit])
 
-  const mutate = useCallback(async <Result,>(mutation: Mutation<Result>) => {
+  const mutate = useCallback(async <Result,>(mutation: Mutation<Result>): Promise<Result | undefined> => {
     const before = stateRef.current
     const after = mutation.apply(before)
     if (after === before) {
       notifyRef.current(mutation.invalid ?? 'Operação inválida', 'error')
-      return
+      return undefined
     }
     commit(after)
 
@@ -119,10 +119,12 @@ export function useProjectData(initial: AppState, notify: Notify) {
       const result = await mutation.persist({ before, after })
       if (mutation.reconcile) commit(mutation.reconcile(stateRef.current, result, { before, after }))
       if (mutation.success) notifyRef.current(mutation.success)
+      return result
     } catch (error) {
       // Volta ao estado anterior inteiro: sem isso a tela mostraria algo que o banco não tem.
       commit(before)
       notifyRef.current(error instanceof ApiError ? error.detail : 'Falha ao salvar', 'error')
+      return undefined
     }
   }, [commit])
 
@@ -202,7 +204,7 @@ export function useProjectData(initial: AppState, notify: Notify) {
     },
 
     captureInbox(text: string) {
-      return mutate({
+      return mutate<{ inboxItem: DbInboxItem } | null>({
         apply: (current) => addInboxItem(current, text),
         invalid: 'Escreva o que aconteceu antes de enviar',
         persist: ({ before, after }) => {
@@ -215,10 +217,10 @@ export function useProjectData(initial: AppState, notify: Notify) {
           const created = added(before.inbox, after.inbox)
           return result && created ? replaceInbox(current, created.id, toDomainInbox(result.inboxItem)) : current
         },
-      })
+      }).then((result) => result?.inboxItem.id ?? null)
     },
 
-    /** Sem otimista: nada para mostrar antes do upload terminar. */
+    /** Sem otimista: nada para mostrar antes do upload terminar. Devolve o id do item criado. */
     async captureInboxAudio(file: File | Blob, caption?: string) {
       const form = new FormData()
       form.append('file', file, file instanceof File ? file.name : 'gravacao.webm')
@@ -226,9 +228,11 @@ export function useProjectData(initial: AppState, notify: Notify) {
       try {
         const { inboxItem } = await postForm<{ inboxItem: DbInboxItem }>('/api/inbox/audio', form)
         commit({ ...stateRef.current, inbox: [toDomainInbox(inboxItem), ...stateRef.current.inbox] })
-        notifyRef.current('Áudio enviado — acompanhe o status na lista.')
+        notifyRef.current('Áudio enviado — revisão aberta.')
+        return inboxItem.id
       } catch (error) {
         notifyRef.current(error instanceof ApiError ? error.detail : 'Falha ao enviar áudio', 'error')
+        return null
       }
     },
 

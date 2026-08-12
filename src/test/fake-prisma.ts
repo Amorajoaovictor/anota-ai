@@ -87,6 +87,10 @@ export function createFakeJobStore(seed: Partial<JobRecord>[] = []) {
     if (where.status && job.status !== where.status) return false
     if (where.runAt?.lte && job.runAt > where.runAt.lte) return false
     if (where.lockedAt?.lt && !(job.lockedAt && job.lockedAt < where.lockedAt.lt)) return false
+    if (where.leaseExpiresAt === null && job.leaseExpiresAt !== null) return false
+    if (where.leaseExpiresAt?.lt && !(job.leaseExpiresAt && job.leaseExpiresAt < where.leaseExpiresAt.lt)) return false
+    if (where.lockedBy && job.lockedBy !== where.lockedBy) return false
+    if (where.cancelledAt === null && job.cancelledAt !== null) return false
     if (where.dedupeKey !== undefined && job.dedupeKey !== where.dedupeKey) return false
     return true
   }
@@ -118,7 +122,9 @@ export function createFakeJobStore(seed: Partial<JobRecord>[] = []) {
       },
       async findFirst({ where, orderBy }: any) {
         const found = jobs.filter((job) => matches(job, where))
-        if (orderBy?.runAt === 'asc') found.sort((a, b) => a.runAt.getTime() - b.runAt.getTime())
+        if (Array.isArray(orderBy)) {
+          found.sort((a, b) => (b.priority - a.priority) || (a.runAt.getTime() - b.runAt.getTime()))
+        } else if (orderBy?.runAt === 'asc') found.sort((a, b) => a.runAt.getTime() - b.runAt.getTime())
         // Prisma devolve cópias; retornar a referência viva esconderia mutações concorrentes.
         return found[0] ? { ...found[0] } : null
       },
@@ -150,5 +156,15 @@ function buildJob(data: Partial<JobRecord>): JobRecord {
     lockedBy: data.lockedBy ?? null,
     lastError: data.lastError ?? null,
     dedupeKey: data.dedupeKey ?? null,
+    ownerId: data.ownerId ?? null,
+    aiRunId: data.aiRunId ?? null,
+    step: data.step ?? null,
+    inputVersion: data.inputVersion ?? null,
+    inputHash: data.inputHash ?? null,
+    priority: data.priority ?? 0,
+    leaseExpiresAt: data.leaseExpiresAt ?? null,
+    heartbeatAt: data.heartbeatAt ?? null,
+    timeoutMs: data.timeoutMs ?? null,
+    cancelledAt: data.cancelledAt ?? null,
   }
 }

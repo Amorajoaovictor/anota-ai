@@ -1,71 +1,292 @@
-# Plano do harness de IA
+# Plano completo do harness de IA
 
-## Objetivo
+**Versão:** 2.0
 
-Construir um fluxo rápido, preciso e controlado para transformar áudio ou texto em entidades do sistema.
+**Status:** pronto para execução por fases
 
-O fluxo terá duas chamadas de LLM depois da transcrição:
+**Escopo:** entrada em texto ou áudio, organização em Markdown, revisão humana, proposta estruturada, segunda aprovação e criação transacional de entidades
 
-1. Organizar a transcrição em Markdown editável.
-2. Transformar o Markdown aprovado em uma proposta definitiva de entidades.
+**Aplicação:** Central de Projetos
 
-## Contratos já definidos
+## 1. Objetivo
 
-- [x] A transcrição é uma etapa isolada e não consulta projetos, contextos, tags ou dicionários.
-- [x] A primeira chamada de LLM produz Markdown organizado e resumido.
-- [x] O Markdown será editado visualmente, com experiência semelhante a Notion ou Markdown renderizado do GitHub.
-- [x] O usuário pode editar, excluir e adicionar informações antes da primeira aprovação.
-- [x] O Markdown aprovado é a única fonte autoritativa de intenção e conteúdo novo para a segunda chamada.
-- [x] A transcrição original não é enviada novamente para a segunda chamada.
-- [x] Haverá duas aprovações: uma do Markdown e outra do preview final.
-- [x] `Task`, `Note`, `Meeting` e `Milestone` são entidades separadas.
-- [x] Card é apenas o componente visual compartilhado entre essas entidades.
-- [x] Contextos e tags apoiam classificações futuras, mas não são a saída principal.
-- [x] Correções do usuário alimentam aprendizado futuro.
-- [x] Uma conversão entre entidades preserva rastreabilidade e histórico.
-- [ ] Confirmar se busca híbrida ou vetorial entrará na primeira versão.
+Construir fluxo rápido, rastreável e seguro para transformar texto ou áudio em entidades do sistema sem permitir escrita direta do modelo no banco.
 
-## Fluxo acordado
+Fluxo possui duas etapas semânticas de LLM depois da transcrição:
+
+1. Organizar conteúdo em Markdown editável sem perder informação.
+2. Transformar snapshot aprovado em proposta única, estruturada e editável.
+
+Retry técnico pode repetir mesma etapa. Retry não cria terceira etapa semântica nem modelo avaliador oculto.
+
+## 2. Decisões fechadas
+
+- [x] Transcrição recebe somente áudio e metadados técnicos necessários.
+- [x] LLM 1 não consulta projetos, contextos, tags, notas, tarefas ou dicionários.
+- [x] LLM 1 organiza sem perda. Resumo, quando exibido, é campo separado e nunca substitui conteúdo organizado.
+- [x] Markdown aprovado é única fonte autoritativa de intenção e conteúdo novo para LLM 2.
+- [x] Transcrição original não volta para LLM 2.
+- [x] Usuário aprova conteúdo antes de contextualização e aprova entidades antes de qualquer escrita.
+- [x] Uma entrada produz uma proposta consolidada, não várias solicitações de aprovação.
+- [x] Um tópico pode gerar zero, uma ou várias entidades relacionadas.
+- [x] `Task`, `Meeting`, `Note` e `Milestone` são entidades de negócio separadas.
+- [x] Card é componente visual compartilhado, não entidade de domínio.
+- [x] Projetos, aliases, módulos, tags, contextos e dependências podem aparecer como ações auxiliares.
+- [x] Modelo nunca cria usuário, pessoa ou credencial.
+- [x] Toda ação gerada por IA passa pela aba `Revisão IA`.
+- [x] Execução aprovada é atômica na primeira versão: tudo confirma ou nada confirma.
+- [x] Busca exata e full-text fazem parte da primeira versão.
+- [x] Busca vetorial e `pgvector` ficam fora da primeira versão até eval demonstrar necessidade.
+- [x] Notas privadas existentes nunca entram em busca, embedding ou prompt.
+- [x] Nota criada por este fluxo nasce privada e não vira contexto futuro automaticamente.
+- [x] Correção manual é registrada, mas não vira aprendizado automático na primeira versão.
+- [x] Áudio temporário é apagado após transcrição, descarte ou falha final.
+- [x] Primeira versão aceita somente entradas que caibam integralmente no contexto configurado. Não haverá chunking oculto.
+- [x] Entrada grande demais é preservada e recebe erro acionável; nunca é truncada silenciosamente.
+- [x] Arquitetura continua preparada para chunking futuro sem mudar contratos de aprovação.
+
+## 3. Fora de escopo inicial
+
+- Multiagentes.
+- Autonomia irrestrita.
+- Escrita direta do LLM no banco.
+- Ferramentas de escrita durante análise.
+- Terceiro modelo para revisar LLM 2.
+- Chunking de transcrição em várias chamadas.
+- Busca vetorial.
+- Treinamento ou fine-tuning automático com correções.
+- Uso de notas privadas como contexto.
+- Execução parcial da proposta.
+- Atualização ou exclusão automática de entidades existentes.
+- Agente desenvolvedor e alterações de código.
+
+## 4. Fluxo final
 
 ```mermaid
 flowchart LR
-    A["Áudio ou texto"] --> B["Transcrição"]
-    B --> C["LLM 1: organizar"]
-    C --> D["Markdown visual e editável"]
-    D --> E["Aprovação 1: conteúdo"]
-    E --> F["Referências opcionais"]
-    F --> G["LLM 2: proposta definitiva"]
-    G --> H["Preview dos cards"]
-    H --> I["Aprovação 2: entidades"]
-    I --> J["Validação e execução"]
-    J --> K["Correções e aprendizado"]
+    A["Texto ou áudio"] --> B["Captura persistida"]
+    B --> C{"Áudio?"}
+    C -->|Sim| D["Transcrição isolada"]
+    C -->|Não| E["Snapshot do texto"]
+    D --> E
+    E --> F["Validação de tamanho"]
+    F --> G["LLM 1: organizar sem perda"]
+    G --> H["Markdown visual editável"]
+    H --> I["Aprovação 1"]
+    I --> J["Snapshot imutável"]
+    J --> K["Busca exata e full-text"]
+    K --> L["LLM 2: proposta consolidada"]
+    L --> M["Validação estrutural"]
+    M --> N["Preview editável"]
+    N --> O["Aprovação 2"]
+    O --> P["Revalidação de autorização"]
+    P --> Q["Execução transacional"]
+    Q --> R["Entidades + origem + auditoria"]
 ```
 
----
+## 5. Limites de entrada
 
-## Fase 0 — Contratos, estados e testes de aceitação
+### 5.1 Regra de contexto
 
-### Comportamentos protegidos
+Antes de chamar provedor, sistema calcula orçamento real:
 
-- Duas chamadas de LLM, sem terceira etapa de raciocínio escondida.
-- Duas aprovações humanas antes da escrita definitiva.
-- Conteúdo removido do Markdown não reaparece.
-- Conteúdo adicionado pelo usuário possui mesma autoridade que conteúdo produzido pelo LLM 1.
-- Nenhuma entidade é criada antes da aprovação do preview final.
-- Busca externa, quando existir, não cria informação ausente do Markdown.
+```text
+entrada máxima = janela do modelo
+               - prompt de sistema
+               - saída reservada
+               - referências reservadas
+               - margem de segurança
+```
 
-### TODO
+Valores ficam versionados por modelo e ambiente. Nenhum limite fica espalhado em componentes ou rotas.
 
-- [ ] Definir estados persistidos do fluxo.
-- [ ] Definir transições permitidas entre os estados.
-- [ ] Definir contrato de erro e retry de cada etapa.
-- [ ] Definir regra para retomar processamento interrompido.
-- [ ] Definir idempotência das duas chamadas e da execução final.
-- [ ] Definir versionamento dos prompts.
-- [ ] Definir schema da proposta definitiva.
-- [ ] Criar testes de aceitação antes da implementação.
+### 5.2 Comportamento da primeira versão
 
-### Estados propostos para discussão
+- Contar tokens antes de LLM 1 e antes de LLM 2.
+- Impedir aprovação de Markdown que não caiba junto do orçamento mínimo de referências e saída.
+- Nunca cortar transcrição, Markdown, tópico ou referência no meio.
+- Quando entrada exceder limite, registrar `INPUT_TOO_LARGE`, manter conteúdo intacto e orientar divisão em novas entradas.
+- Registrar tamanho em bytes, caracteres e tokens sem registrar conteúdo em log.
+- Manter limites de upload, duração de áudio, Markdown e quantidade de itens em configuração central.
+- Limitar proposta a no máximo 100 itens. Entrada maior deve ser dividida.
+
+### 5.3 Evolução futura
+
+Chunking poderá entrar somente como nova versão do harness. Deve manter:
+
+- duas etapas semânticas;
+- snapshot único aprovado;
+- ausência de perda ou duplicação entre chunks;
+- evidência ligada ao snapshot final;
+- custo e quantidade de chamadas visíveis em auditoria técnica.
+
+## 6. Entidades e cardinalidade
+
+### 6.1 Entidades principais
+
+- `Task`: exige projeto.
+- `Meeting`: projeto opcional.
+- `Note`: exige projeto e nasce privada.
+- `Milestone`: exige projeto.
+
+### 6.2 Ações auxiliares permitidas
+
+- Criar projeto quando conteúdo aprovado pedir projeto novo explicitamente.
+- Criar alias, módulo ou tag.
+- Criar contexto aprovado.
+- Criar dependência entre tasks.
+- Vincular task e milestone.
+
+### 6.3 Regras
+
+- Um tópico pode gerar várias entidades.
+- Uma entidade pode usar evidências de vários tópicos.
+- Cada tópico sem entidade recebe `UNRESOLVED` com motivo.
+- Reunião pode gerar `Meeting`, tasks, notes e contexts relacionados.
+- Relação entre ações usa IDs locais da proposta antes de existirem IDs de banco.
+- Dependência só pode ligar tasks diferentes do mesmo projeto.
+- Milestone e task vinculados devem pertencer ao mesmo projeto.
+- Referência existente precisa constar no snapshot de busca e pertencer ao proprietário.
+- Conteúdo de referência define vínculo; nunca cria fato ausente no Markdown.
+
+## 7. Persistência versionada
+
+`InboxItem` continua representando captura. Fluxo novo usa modelos próprios; `suggestion` não será fonte do harness v2.
+
+### 7.1 `AiRun`
+
+Representa uma execução completa do harness.
+
+Campos mínimos:
+
+- `id`.
+- `ownerId`.
+- `inboxItemId`.
+- `status`.
+- `version` para concorrência otimista.
+- `failedStep` opcional.
+- `errorCode` opcional.
+- `retryable`.
+- `activeTranscriptId`.
+- `activeMarkdownRevisionId`.
+- `activeProposalRevisionId`.
+- `createdAt`, `updatedAt`, `discardedAt`, `processedAt`.
+
+Índices:
+
+- `[ownerId, createdAt]`.
+- `[status, updatedAt]`.
+- `[inboxItemId, createdAt]`.
+
+### 7.2 `TranscriptRevision`
+
+- `id`, `aiRunId`, `version`.
+- `text`.
+- `contentHash`.
+- `source`: `TEXT` ou `STT`.
+- `provider`, `model`, `language` opcionais.
+- `durationMs`, `inputBytes`, `tokenCount`.
+- `speakerSegments` e `timestamps` opcionais.
+- `createdAt`.
+- Unique `[aiRunId, version]`.
+
+Reprocessar com outro provedor cria nova revisão; nunca sobrescreve anterior.
+
+### 7.3 `MarkdownRevision`
+
+- `id`, `aiRunId`, `version`.
+- `parentRevisionId` opcional.
+- `source`: `AI` ou `USER`.
+- `content`.
+- `contentHash`.
+- `tokenCount`.
+- `promptVersion` e `model` quando gerada por IA.
+- `approvedAt` opcional.
+- `createdAt`.
+- Unique `[aiRunId, version]`.
+
+Markdown aprovado fica imutável. Mudança posterior cria nova revisão e invalida artefatos derivados.
+
+### 7.4 `RetrievalSnapshot`
+
+- `id`, `aiRunId`, `markdownRevisionId`.
+- `queryVersion`.
+- `contentHash`.
+- candidatos ordenados, motivos e scores em JSON validado.
+- IDs, tipos, versões e trechos mínimos das referências.
+- `createdAt`.
+
+Snapshot permite reproduzir proposta sem consultar estado atual novamente.
+
+### 7.5 `ProposalRevision`
+
+- `id`, `aiRunId`, `markdownRevisionId`, `retrievalSnapshotId`.
+- `version`, `parentRevisionId` opcional.
+- `source`: `AI` ou `USER`.
+- `schemaVersion`.
+- `rawOutput` somente com política de acesso restrita.
+- `validatedPlan`.
+- `contentHash`.
+- `promptVersion`, `provider`, `model`.
+- `inputTokens`, `outputTokens`, `latencyMs`.
+- `approvedAt` opcional.
+- `createdAt`.
+- Unique `[aiRunId, version]`.
+
+### 7.6 `ProposalItem`
+
+- `id`, `proposalRevisionId`.
+- `localKey` estável dentro da proposta.
+- `entityType`.
+- `operation`, inicialmente somente `CREATE` e `LINK`.
+- `payload` validado.
+- `dependsOn`.
+- `evidence`.
+- `confidence` por campo.
+- `duplicateCandidates`.
+- `selected`.
+- `userEdited`.
+- `createdAt`.
+- Unique `[proposalRevisionId, localKey]`.
+
+### 7.7 `AiApproval`
+
+- `id`, `aiRunId`, `ownerId`.
+- `type`: `MARKDOWN` ou `ENTITIES`.
+- `targetId` e `targetHash`.
+- `createdAt`.
+- Unique `[type, targetId]`.
+
+Aprovação sempre aponta para conteúdo exato, nunca para “versão atual” mutável.
+
+### 7.8 `AiExecution`
+
+- `id`, `aiRunId`, `proposalRevisionId`.
+- `status`: `PENDING`, `RUNNING`, `COMPLETED`, `FAILED`.
+- `idempotencyKey` única.
+- `startedAt`, `completedAt`, `errorCode`.
+- Unique `[proposalRevisionId]`.
+
+### 7.9 `EntityOrigin`
+
+- `id`, `proposalItemId`.
+- `entityType`, `entityId`.
+- `createdAt`.
+- Unique `[entityType, entityId]`.
+
+Executor cria entidade e origem na mesma transação.
+
+### 7.10 `AiCallAttempt`
+
+- etapa, tentativa, provedor, modelo e versão do prompt.
+- hash da entrada e request ID do provedor.
+- tokens, latência, custo estimado e resultado técnico.
+- código de erro sanitizado.
+- nenhum conteúdo bruto em log ou auditoria operacional.
+
+## 8. Estados e transições
+
+### 8.1 Estados
 
 ```text
 RECEIVED
@@ -73,428 +294,870 @@ TRANSCRIBING
 TRANSCRIBED
 ORGANIZING
 AWAITING_MARKDOWN_APPROVAL
-PREPARING_REFERENCES
+RETRIEVING_REFERENCES
 MATERIALIZING
 AWAITING_ENTITY_APPROVAL
 EXECUTING
 PROCESSED
-ERROR
+FAILED
 DISCARDED
 ```
 
-### Casos de teste mínimos
+`FAILED` usa `failedStep`, `errorCode` e `retryable`; não perde etapa onde falhou.
 
-- [ ] Áudio com uma task simples.
-- [ ] Áudio com várias tasks.
-- [ ] Reunião com data e tasks relacionadas.
-- [ ] Nota importante sem ação executável.
-- [ ] Marco com data esperada.
-- [ ] Conteúdo com entidades de projetos diferentes.
-- [ ] Tópico ambíguo.
-- [ ] Task possivelmente duplicada.
-- [ ] Usuário remove tópico antes da primeira aprovação.
-- [ ] Usuário adiciona tópico manualmente no Markdown.
-- [ ] Usuário troca `Task` por `Note` no preview.
-- [ ] Falha da primeira chamada sem perda da transcrição.
-- [ ] Falha da segunda chamada sem perda do Markdown aprovado.
-- [ ] Segunda aprovação repetida sem criar entidades duplicadas.
+### 8.2 Caminho normal
 
----
+```text
+Texto: RECEIVED -> TRANSCRIBED
+Áudio: RECEIVED -> TRANSCRIBING -> TRANSCRIBED
 
-## Fase 1 — Persistência do fluxo
+TRANSCRIBED
+-> ORGANIZING
+-> AWAITING_MARKDOWN_APPROVAL
+-> RETRIEVING_REFERENCES
+-> MATERIALIZING
+-> AWAITING_ENTITY_APPROVAL
+-> EXECUTING
+-> PROCESSED
+```
 
-### TODO
+### 8.3 Transições especiais
 
-- [ ] Preservar transcrição original separadamente.
-- [ ] Persistir Markdown gerado pelo LLM 1.
-- [ ] Persistir Markdown editado pelo usuário.
-- [ ] Criar snapshot imutável do Markdown na primeira aprovação.
-- [ ] Registrar hash e versão do snapshot aprovado.
-- [ ] Persistir proposta bruta e proposta validada do LLM 2.
-- [ ] Persistir versão editada e aprovada no segundo preview.
-- [ ] Relacionar cada entidade criada com item de entrada e snapshot de origem.
-- [ ] Registrar autoria de cada alteração: IA ou usuário.
-- [ ] Garantir isolamento por proprietário em todas as consultas.
+- Estado não terminal pode ir para `DISCARDED`.
+- Falha técnica vai para `FAILED` somente após esgotar retries automáticos ou exigir ação do usuário.
+- Retry volta exatamente para `failedStep`, usando mesmos snapshots.
+- Editar Markdown ainda não aprovado cria revisão e mantém `AWAITING_MARKDOWN_APPROVAL`.
+- Alterar Markdown já aprovado cria nova revisão, cancela jobs derivados e volta para `AWAITING_MARKDOWN_APPROVAL`.
+- Editar preview cria nova `ProposalRevision` de origem `USER` e mantém `AWAITING_ENTITY_APPROVAL`.
+- `PROCESSED` e `DISCARDED` são terminais.
+- Reprocessamento completo cria novo `AiRun`; não reabre run terminal.
 
-### Critério de aceite
+### 8.4 Concorrência
 
-- [ ] Reload da página não perde transcrição, Markdown, proposta ou estado atual.
-- [ ] Retry reutiliza snapshot correto e não versão antiga.
-- [ ] Alteração posterior não modifica snapshot já aprovado.
+Toda mutação recebe `expectedVersion`. Update usa simultaneamente:
 
----
+- `id`.
+- `ownerId`.
+- estado esperado.
+- versão esperada.
 
-## Fase 2 — Transcrição
+Sucesso incrementa versão. Zero linhas alteradas retorna `409 STALE_VERSION`.
 
-### Regra
+Job carrega `aiRunId`, etapa, versão esperada e hash de entrada. Antes e depois de chamada externa, job confirma que run continua na mesma versão. Resultado antigo é descartado e auditado como `STALE_RESULT`.
 
-Transcrição produz apenas texto. Nenhuma classificação ou consulta contextual ocorre aqui.
+## 9. Idempotência
 
-### TODO
+Chaves mínimas:
 
-- [ ] Receber áudio validado.
-- [ ] Armazenar áudio temporariamente.
-- [ ] Transcrever áudio.
-- [ ] Salvar texto original da transcrição.
-- [ ] Excluir áudio temporário após processamento conforme política de retenção.
-- [ ] Permitir retry seguro quando provedor falhar.
-- [ ] Mostrar erro recuperável ao usuário.
-- [ ] Registrar provedor, modelo, duração e latência sem expor conteúdo sensível nos logs.
+```text
+transcribe:{runId}:{audioHash}:{provider}:{model}
+organize:{runId}:{transcriptHash}:{promptVersion}:{model}
+retrieve:{runId}:{markdownHash}:{queryVersion}
+materialize:{runId}:{markdownHash}:{retrievalHash}:{promptVersion}:{model}
+execute:{approvedProposalRevisionId}
+```
 
-### Critério de aceite
+Regras:
 
-- [ ] Transcrição não recebe projeto, contexto, tag, task ou nota.
-- [ ] Áudio não permanece armazenado além da política definida.
-- [ ] Falha não apaga texto ou estado já persistido.
+- Unique constraint protege cada chave.
+- Clique repetido devolve execução existente.
+- Retry de provedor pode gerar nova cobrança, mas nunca novo artefato ativo para mesma chave.
+- Resultado só fica ativo após validação de versão e hash.
+- Executor não usa somente status para deduplicar; usa `AiExecution.idempotencyKey`.
 
----
+## 10. Contrato de erro e retry
 
-## Fase 3 — Primeira chamada: organização em Markdown
+Erro persistido e resposta pública usam:
+
+```json
+{
+  "code": "PROVIDER_RATE_LIMITED",
+  "step": "MATERIALIZING",
+  "retryable": true,
+  "message": "Não foi possível concluir agora. Nova tentativa será feita.",
+  "correlationId": "..."
+}
+```
+
+### 10.1 Retry automático
+
+- Timeout, `408`, `429` e `5xx`: retry com exponential backoff, jitter e `Retry-After` quando existir.
+- JSON inválido: repetir mesma etapa dentro do limite configurado.
+- `4xx` de contrato, entrada grande, autenticação e autorização: sem retry automático.
+- Cada etapa possui limite próprio de tentativas e timeout.
+- UI mostra tentativa e próximo retry sem expor resposta bruta do provedor.
+
+### 10.2 Retry manual
+
+- Permitido somente em `FAILED` e quando dados de origem continuam disponíveis.
+- Usa snapshot exato que falhou.
+- Trocar provedor ou modelo cria nova tentativa auditada.
+- Retry após edição exige nova revisão e novo hash.
+
+## 11. Transcrição
 
 ### Entrada
 
-- Transcrição original.
+- Bytes do áudio.
+- MIME type validado.
+- Idioma configurado, padrão `pt-BR`.
+- Opções técnicas de timestamps e falantes quando suportadas.
+
+### Regras
+
+- Nenhum dado de projeto acompanha chamada.
+- Validar extensão, MIME real, tamanho e duração.
+- Storage key usa proprietário e UUID, nunca nome original.
+- Nome original não entra em log.
+- Transcrição é preservada como revisão.
+- Áudio é excluído imediatamente após persistência da transcrição.
+- Descarte e falha final também excluem áudio.
+- Sweeper remove órfãos com mais de 24 horas.
+- Falha ao excluir gera alerta operacional e novo job de limpeza.
+
+### Critérios de aceite
+
+- Provedor não recebe contexto de negócio.
+- Retry não concatena transcrição repetida.
+- Reprocessamento cria nova revisão.
+- Falha não apaga transcrição já persistida.
+- Áudio órfão não permanece além de 24 horas.
+
+## 12. LLM 1 — organização em Markdown
+
+### Entrada
+
+- `TranscriptRevision.text`.
 - Data atual.
-- Fuso horário.
+- Fuso horário do usuário.
+- Versão do prompt.
 
 ### Saída
 
-- Markdown limpo, resumido e dividido em tópicos.
-- Datas mencionadas preservadas.
-- Nomes e termos originais preservados.
-- Um assunto principal por tópico sempre que possível.
-- Nenhuma entidade criada.
+- Markdown completo e organizado.
+- Resumo opcional separado.
+- Tópicos com IDs estáveis adicionados em metadados, sem poluir visualização.
+- Datas, nomes, decisões, incertezas e termos originais preservados.
+- Tópico neutro quando tipo não estiver claro.
 
-### TODO
+### Proibições
 
-- [ ] Criar prompt específico do organizador.
-- [ ] Proibir invenção de projeto, prazo, pessoa ou decisão.
-- [ ] Proibir consulta a contexto de negócio.
-- [ ] Definir padrão simples de títulos e listas Markdown.
-- [ ] Preservar informação importante mesmo quando não for task.
-- [ ] Separar reuniões, notas, marcos e tasks em tópicos claros.
-- [ ] Permitir tópico neutro quando tipo não estiver claro.
-- [ ] Validar que saída é Markdown não vazio.
-- [ ] Testar transcrições longas, repetitivas e desorganizadas.
-- [ ] Testar datas relativas usando data e fuso informados.
+- Consultar contexto de negócio.
+- Inventar projeto, prazo, pessoa ou decisão.
+- Remover informação por não parecer tarefa.
+- Classificar definitivamente entidades.
+- Criar dados no banco.
 
-### Critério de aceite
+### Validação
 
-- [ ] Markdown fica legível sem mostrar sintaxe crua ao usuário.
-- [ ] Nenhum fato ausente na transcrição é adicionado pelo modelo.
-- [ ] Tópicos importantes não são eliminados pelo resumo.
+- Markdown não vazio.
+- Conteúdo dentro do limite.
+- IDs de tópico únicos.
+- Nenhum HTML perigoso.
+- Links sanitizados na renderização.
+- Teste de cobertura semântica compara fatos essenciais das fixtures, não similaridade textual simples.
 
----
+## 13. Editor e primeira aprovação
 
-## Fase 4 — Editor visual e primeira aprovação
+Editor vira componente reutilizável com armazenamento canônico em Markdown.
 
-### Regra
+### Requisitos
 
-Interface mostra Markdown renderizado e editável. Versão confirmada passa a ser autoridade da segunda chamada.
+- Renderização WYSIWYG.
+- Títulos, listas, checklist, negrito e links.
+- Criar, editar, dividir, unir e excluir tópicos.
+- Mostrar transcrição original em painel separado.
+- Autosave com debounce e versão esperada.
+- Estado visível: salvando, salvo, conflito ou erro.
+- Aviso antes de sair com mudança não persistida.
+- Ação `Aprovar Markdown` desabilitada enquanto autosave estiver pendente.
+- Preview do hash e versão usados na aprovação fica invisível ao usuário, mas persistido.
+- Edição posterior cria nova revisão; nunca altera snapshot aprovado.
 
-### TODO
+### Canonicalização
 
-- [ ] Escolher e componentizar editor WYSIWYG com armazenamento em Markdown.
-- [ ] Permitir títulos, listas, checklist, negrito e links.
-- [ ] Permitir adicionar, editar, dividir, unir e excluir tópicos.
-- [ ] Disponibilizar visualização separada da transcrição original.
-- [ ] Manter autosave do rascunho.
-- [ ] Avisar sobre alterações ainda não salvas.
-- [ ] Criar ação `Aprovar Markdown`.
-- [ ] Congelar snapshot confirmado.
-- [ ] Impedir que edição posterior altere job já iniciado.
-- [ ] Permitir criar nova revisão se usuário quiser mudar conteúdo aprovado.
+- UTF-8 sem BOM.
+- Quebra de linha `LF`.
+- Serialização determinística do editor.
+- Espaços significativos do Markdown preservados.
+- Hash SHA-256 calculado sobre bytes canônicos.
 
-### Critério de aceite
+## 14. Recuperação de referências
 
-- [ ] Texto removido não chega à segunda chamada.
-- [ ] Texto adicionado chega integralmente à segunda chamada.
-- [ ] Segunda chamada usa exatamente snapshot aprovado.
+Recuperação básica é obrigatória. Vetor não entra nesta versão.
 
----
+### 14.1 Fontes elegíveis
 
-## Fase 5 — Busca híbrida ou vetorial opcional
-
-### Regra
-
-Markdown continua única fonte de intenção e conteúdo novo. Resultados recuperados são apenas referências existentes.
-
-### Decisão pendente
-
-- [ ] Confirmar se fase entra no primeiro release.
-- [ ] Confirmar quais entidades podem ser indexadas.
-- [ ] Confirmar provedor de embeddings.
-- [ ] Confirmar se busca roda sempre ou somente quando correspondência exata falhar.
-
-### Conteúdo elegível proposto
-
-- Projetos.
+- Projetos ativos.
 - Aliases.
 - Módulos.
 - Tags.
 - Tasks existentes.
-- Marcos.
+- Milestones.
 - Contextos aprovados.
-- Correções anteriores.
+- Correções convertidas manualmente em contexto ou vocabulário editável.
 
-### Conteúdo proibido
+### 14.2 Fontes proibidas
 
 - Notas privadas.
 - Áudio temporário.
-- Segredos.
+- Segredos e credenciais.
 - Dados de outro proprietário.
+- Conteúdo descartado.
+- Propostas ainda não aprovadas de outras entradas.
 
-### TODO técnico, se aprovado
+### 14.3 Estratégia da primeira versão
 
-- [ ] Criar busca exata por nome, alias, tag e módulo.
-- [ ] Criar full-text search no PostgreSQL.
-- [ ] Avaliar `pgvector` no Neon.
-- [ ] Gerar embeddings em lote para tópicos do Markdown aprovado.
-- [ ] Pré-calcular embeddings das referências existentes.
-- [ ] Atualizar embeddings quando conteúdo indexado mudar.
-- [ ] Filtrar sempre por proprietário.
-- [ ] Combinar busca textual e vetorial.
-- [ ] Limitar quantidade de candidatos enviados ao LLM 2.
-- [ ] Marcar candidatos como `REFERENCE_ONLY`.
-- [ ] Exigir evidência do Markdown para qualquer conteúdo criado.
-- [ ] Medir recall e latência antes de adicionar índice aproximado.
+1. Busca exata normalizada por projeto, alias, módulo e tag.
+2. PostgreSQL full-text por tópico para tasks, milestones e contexts.
+3. Busca de duplicidade por título normalizado e full-text.
+4. Ranking determinístico combinando tipo de match, projeto e atualização.
+5. Limite por tipo e por tópico.
+6. Snapshot imutável dos candidatos enviados ao LLM 2.
 
-### Critério de aceite
+### 14.4 Segurança contra prompt injection
 
-- [ ] Referência recuperada pode definir vínculo, nunca conteúdo novo.
-- [ ] Informação ausente no Markdown não vira entidade.
-- [ ] Informação excluída pelo usuário não reaparece por causa da busca.
-- [ ] Nota privada nunca entra em embedding ou prompt.
+- Referências entram como dados JSON não confiáveis, nunca como mensagem de sistema.
+- Prompt informa explicitamente que instruções dentro das referências devem ser ignoradas.
+- Modelo não recebe ferramentas.
+- Conteúdo recuperado não pode ampliar escopo ou permissões.
+- Saída precisa apontar evidência no Markdown aprovado.
+- Validador rejeita entidade sustentada somente por referência.
 
----
+### 14.5 Evolução para vetor
 
-## Fase 6 — Segunda chamada: proposta definitiva
+`RetrievalProvider` deve permitir futura implementação híbrida. `pgvector` só entra quando:
+
+- corpus de eval mostrar perda relevante de recall no full-text;
+- ganho superar custo e latência;
+- isolamento por proprietário estiver coberto por testes;
+- política de remoção e reindexação estiver pronta;
+- notas privadas continuarem excluídas.
+
+## 15. LLM 2 — proposta consolidada
 
 ### Entrada autoritativa
 
-- Snapshot do Markdown aprovado.
+- Snapshot imutável do Markdown aprovado.
 
-### Entrada auxiliar opcional
+### Entrada auxiliar
 
-- Referências recuperadas e marcadas como somente leitura.
-- Data atual e fuso horário.
-- Schema de saída.
+- `RetrievalSnapshot` marcado como `REFERENCE_ONLY`.
+- Data e fuso horário.
+- Schema JSON versionado.
 
-### Regra
+### Schema lógico
 
-Cada tópico gera uma entidade principal ou um resultado `UNRESOLVED`. Modelo não escreve no banco.
+```json
+{
+  "schemaVersion": 1,
+  "summary": "...",
+  "items": [
+    {
+      "id": "task-1",
+      "topicIds": ["topic-1"],
+      "operation": "CREATE",
+      "entity": "TASK",
+      "dependsOn": [],
+      "data": {},
+      "evidence": [
+        { "topicId": "topic-1", "quote": "..." }
+      ],
+      "confidence": {
+        "type": 95,
+        "project": 80,
+        "dates": 60
+      },
+      "duplicateCandidates": []
+    }
+  ],
+  "unresolved": [
+    {
+      "topicId": "topic-2",
+      "reason": "Projeto não identificado",
+      "evidence": [{ "quote": "..." }]
+    }
+  ]
+}
+```
 
-### Entidades principais
+### Regras de validação
 
-- `Task`.
-- `Meeting`.
-- `Note`.
-- `Milestone`.
+- JSON strict; campos desconhecidos rejeitados.
+- `schemaVersion` obrigatória.
+- IDs locais únicos.
+- Máximo de 100 itens.
+- Zero ou mais itens por tópico.
+- Cada tópico aparece em item, `unresolved` ou ambos quando parte dele ficou pendente.
+- Evidência deve existir literalmente no snapshot aprovado.
+- Validador resolve offset e ocorrência da evidência; modelo não controla offset final.
+- Confiança varia de 0 a 100 e existe separadamente para tipo, projeto e datas quando aplicáveis.
+- Datas usam ISO 8601 e fuso explícito.
+- Projeto existente só pode usar ID presente no `RetrievalSnapshot`.
+- Projeto novo exige ação local explícita e evidência direta no Markdown.
+- Dependências formam grafo acíclico.
+- `NOTE` usa `private: true` obrigatoriamente na criação inicial.
+- Usuários, pessoas, segredos e permissões nunca são entidades criáveis.
+- Saída inválida não chega ao preview nem ao executor.
 
-### TODO
+## 16. Preview e segunda aprovação
 
-- [ ] Criar schema discriminado por entidade.
-- [ ] Permitir exatamente uma entidade principal por tópico.
-- [ ] Permitir `UNRESOLVED` sem obrigar modelo a inventar.
-- [ ] Exigir trecho de evidência do Markdown em cada entidade.
-- [ ] Exigir confiança separada para tipo, projeto e datas.
-- [ ] Resolver projeto existente somente por referência válida.
-- [ ] Sugerir prioridade, complexidade, prazo, previsão, tags e marcos para tasks.
-- [ ] Sugerir data, horário, projeto e link para reuniões.
-- [ ] Manter notas privadas por padrão.
-- [ ] Sugerir datas, status e vínculos para marcos.
-- [ ] Detectar possíveis duplicidades.
-- [ ] Validar JSON antes de persistir proposta.
-- [ ] Definir retry técnico sem criar terceira etapa semântica.
+Preview reutiliza componentes visuais das entidades reais, em modo `proposal`.
 
-### Critério de aceite
+### Funcionalidades
 
-- [ ] Modelo não cria entidade baseada somente em referência recuperada.
-- [ ] Modelo não usa transcrição original.
-- [ ] Modelo não usa versão anterior do Markdown.
-- [ ] Saída inválida não chega ao executor.
+- Mostrar uma proposta consolidada.
+- Editar campos permitidos.
+- Trocar tipo de entidade.
+- Selecionar ou remover itens.
+- Mostrar dependências e impedir remoção que deixe referência quebrada.
+- Destacar campos incertos, ausentes ou conflitantes.
+- Mostrar evidência e confiança.
+- Mostrar possíveis duplicidades.
+- Exibir `UNRESOLVED` sem forçar criação.
+- Registrar diff entre versão da IA e versão aprovada.
+- Ação única `Aprovar e criar`.
 
----
+### Regras por entidade
 
-## Fase 7 — Preview visual e segunda aprovação
+#### `Task`
 
-### Regra
+- Título, descrição, projeto, módulo, tipo, status, prioridade, complexidade, prazo, previsão, tags, milestones e dependências.
+- Nasce em `Backlog` quando status não for explicitamente aprovado.
 
-Preview usa os mesmos componentes visuais dos cards reais, mas ainda não grava entidades definitivas.
+#### `Meeting`
 
-### Preview de `Task`
+- Título, descrição, projeto opcional, início, fim ou duração, fuso e link opcional.
 
-- Título.
-- Descrição.
-- Projeto.
-- Tipo.
-- Status.
-- Prioridade.
-- Complexidade.
-- Prazo.
-- Previsão.
-- Marcos.
-- Tags.
-- Dependências.
+#### `Note`
 
-### Preview de `Meeting`
+- Título, conteúdo, projeto, task opcional e privacidade fixa como privada na criação.
 
-- Título.
-- Descrição.
-- Projeto opcional.
-- Data.
-- Horário.
-- Link opcional.
+#### `Milestone`
 
-### Preview de `Note`
+- Nome, descrição, projeto, início, previsão, status e tasks vinculadas.
 
-- Título.
-- Conteúdo.
-- Projeto.
-- Task vinculada opcional.
-- Privacidade.
+## 17. Executor
 
-### Preview de `Milestone`
+### Pré-validação fora da transação
 
-- Nome.
-- Descrição.
-- Projeto.
-- Data inicial.
-- Data prevista.
-- Status.
-- Tasks vinculadas.
+- Schema da proposta aprovada.
+- Hash da aprovação.
+- Grafo e ordem das ações.
+- Existência aparente das referências.
+- Tamanho máximo da proposta.
 
-### TODO
+### Revalidação dentro da transação
 
-- [ ] Criar card visual compartilhado e variações por entidade.
-- [ ] Permitir editar todos os campos relevantes.
-- [ ] Permitir trocar tipo antes da criação.
-- [ ] Permitir selecionar ou remover cada proposta.
-- [ ] Preservar dependências entre itens selecionados.
-- [ ] Destacar campos incertos ou ausentes.
-- [ ] Mostrar evidências e confiança sem esconder campos principais.
-- [ ] Mostrar duplicidades antes da aprovação.
-- [ ] Criar ação única `Aprovar e criar`.
-- [ ] Registrar diferenças entre proposta da IA e versão aprovada.
+- Proprietário de todos os projetos e relacionamentos.
+- Estado e versão do `AiRun`.
+- Ausência de execução concluída para mesma chave.
+- Existência atual das referências.
+- Regras de projeto para milestone, task, tags e dependências.
+- Campos obrigatórios e datas.
 
-### Critério de aceite
+### Escritas atômicas
 
-- [ ] Nenhuma entidade é criada antes de `Aprovar e criar`.
-- [ ] Preview corresponde ao card que aparecerá no sistema.
-- [ ] Alterações do usuário são executadas, não proposta antiga.
+Mesma transação cria:
 
----
+1. `AiExecution` ou faz claim de execução pendente.
+2. Entidades na ordem topológica.
+3. Relações.
+4. `EntityOrigin` para cada item.
+5. `AuditLog` sem conteúdo sensível.
+6. Estado `PROCESSED`.
 
-## Fase 8 — Validação e execução
+Qualquer erro reverte tudo. Auditoria da criação não ocorre depois da transação.
 
-### TODO
+### Resultado
 
-- [ ] Validar propriedade de projetos e entidades relacionadas.
-- [ ] Validar campos obrigatórios por tipo.
-- [ ] Validar datas e relações.
-- [ ] Validar que marcos pertencem ao mesmo projeto da task.
-- [ ] Validar dependências entre tasks.
-- [ ] Executar plano aprovado em transação.
-- [ ] Garantir idempotência da segunda aprovação.
-- [ ] Criar entidades separadas nas tabelas corretas.
-- [ ] Relacionar entidades ao tópico e snapshot de origem.
-- [ ] Registrar auditoria da criação.
-- [ ] Retornar resultado parcial somente quando regra permitir.
-- [ ] Reverter toda transação quando plano atômico falhar.
+- Clique repetido retorna entidades da execução original.
+- Falha não deixa metade da proposta criada.
+- Referência removida após preview bloqueia execução inteira e volta para revisão.
+- Nenhum item não selecionado é executado.
 
-### Critério de aceite
+## 18. APIs
 
-- [ ] Clique repetido não duplica entidades.
-- [ ] Referência de outro usuário é rejeitada antes de qualquer escrita.
-- [ ] Falha no meio não deixa metade do plano gravada.
+Rotas mantêm `withOwner` e nunca aceitam `ownerId` do cliente.
 
----
+### Captura e leitura
 
-## Fase 9 — Conversão e aprendizado com correções
+- `POST /api/inbox`: captura texto e cria `AiRun`.
+- `POST /api/inbox/audio`: captura áudio e cria `AiRun`.
+- `GET /api/inbox/:id/harness`: retorna estado, revisões ativas e permissões de ação.
 
-### Regra
+### Markdown
 
-Entidades continuam separadas. Trocar tipo significa converter entidade preservando origem e histórico.
+- `PUT /api/inbox/:id/markdown-draft`: salva nova revisão com `expectedVersion`.
+- `POST /api/inbox/:id/markdown-approval`: aprova hash exato.
 
-### TODO
+### Proposta
 
-- [ ] Implementar conversão `Task -> Note`.
-- [ ] Definir demais conversões permitidas.
-- [ ] Arquivar representação anterior no histórico.
-- [ ] Copiar somente campos compatíveis.
-- [ ] Preservar tópico e snapshot de origem.
-- [ ] Registrar tipo sugerido e tipo final.
-- [ ] Registrar projeto, marcos, prioridade e complexidade corrigidos.
-- [ ] Transformar correções aprovadas em exemplos de classificação futura.
-- [ ] Evitar generalização automática de uma correção isolada.
-- [ ] Permitir consultar e remover aprendizado incorreto.
-- [ ] Manter correções sensíveis fora de prompts futuros quando necessário.
+- `PUT /api/inbox/:id/proposal-draft`: salva edição como nova revisão.
+- `POST /api/inbox/:id/execution`: aprova e executa proposta exata.
 
-### Critério de aceite
+### Controle
 
-- [ ] Conversão não perde rastreabilidade.
-- [ ] Correção futura relevante melhora sugestão sem alterar conteúdo do Markdown.
-- [ ] Aprendizado não expõe notas privadas.
+- `POST /api/inbox/:id/retry`: repete etapa falha.
+- `POST /api/inbox/:id/discard`: descarta e cancela jobs.
 
----
+### Respostas
 
-## Fase 10 — Precisão, velocidade e observabilidade
+- `200/201`: sucesso ou resultado idempotente.
+- `400`: contrato inválido.
+- `401`: sem sessão.
+- `403`: referência existente, mas fora do proprietário.
+- `404`: recurso inexistente sem revelar dados de outro usuário quando necessário.
+- `409`: estado, versão ou hash obsoleto.
+- `413`: arquivo ou conteúdo acima do limite.
+- `422`: proposta semanticamente inconsistente.
+- `429`: limite de uso.
+- `503`: provedor indisponível.
 
-### Estratégia de modelos
+## 19. Fila e workers
 
-- LLM 1 rápido, com thinking desligado.
-- LLM 2 mais forte, responsável pela decisão definitiva.
-- Nenhum terceiro modelo avaliador no fluxo normal.
-- Embedding, se usado, é etapa de recuperação e não nova iteração semântica.
+Primeira versão mantém fila PostgreSQL existente, com melhorias.
 
-### TODO
+### Campos adicionais em `Job`
 
-- [ ] Criar conjunto de evals com entradas reais anonimizadas.
-- [ ] Rodar múltiplas tentativas por caso para medir variação.
-- [ ] Medir precisão por tipo de entidade.
-- [ ] Medir projeto atribuído incorretamente.
-- [ ] Medir duplicidades não detectadas.
-- [ ] Medir campos alterados na segunda revisão.
-- [ ] Medir conversões feitas depois da criação.
-- [ ] Medir taxa de `UNRESOLVED`.
-- [ ] Medir latência p50 e p95 de cada etapa.
-- [ ] Medir tokens de entrada e saída.
-- [ ] Medir cache hit do provedor.
-- [ ] Medir falhas de schema e retries.
-- [ ] Registrar modelo e versão do prompt em cada proposta.
-- [ ] Comparar modelos e configurações antes de trocar produção.
-- [ ] Definir metas somente após obter baseline real.
+- `ownerId`.
+- `aiRunId`.
+- `step`.
+- `inputVersion`.
+- `inputHash`.
+- `priority`.
+- `leaseExpiresAt`.
+- `heartbeatAt`.
+- `timeoutMs`.
+- `cancelledAt`.
 
-### Critério de aceite
+### Tipos de job
 
-- [ ] Mudança de prompt ou modelo roda evals antes da promoção.
-- [ ] Resultado é avaliado pelo estado final criado, não somente pelo texto do modelo.
-- [ ] Regressão de precisão ou latência bloqueia promoção.
+- `audio.transcribe`.
+- `ai.organize`.
+- `ai.retrieve`.
+- `ai.materialize`.
+- `ai.cleanup-audio`.
 
----
+### Regras operacionais
 
-## Fora de escopo deste harness inicial
+- Claim concorrente com lock seguro e `SKIP LOCKED` ou operação SQL atômica equivalente.
+- Heartbeat renova lease enquanto chamada externa estiver ativa.
+- Timeout usa `AbortSignal`; timeout não deixa chamada continuar silenciosamente.
+- Job cancelado verifica cancelamento antes e depois do provedor.
+- Concorrência limitada por proprietário e provedor.
+- Jobs interativos têm prioridade sobre lembretes não urgentes.
+- Backoff usa jitter.
+- Payload contém IDs e hashes, nunca conteúdo grande quando este já estiver persistido.
+- Worker roda fora do ciclo da request web ou por mecanismo gerenciado com tempo suficiente para chamadas.
+- Health check informa backlog, idade do job mais antigo e workers ativos.
 
-- Multiagentes.
-- Autonomia irrestrita.
-- Escrita direta do modelo no banco.
-- Ferramentas de escrita durante análise.
-- Terceira chamada de LLM para revisar a segunda.
-- Uso da transcrição original na segunda chamada.
-- Uso de notas privadas como contexto ou embedding.
-- Criação sem segunda aprovação.
+### Migração futura de fila
 
-## Ordem recomendada de execução
+Trocar fila PostgreSQL por serviço dedicado somente quando métricas mostrarem contenção, backlog sustentado ou pressão de conexões. Contrato `JobQueue` deve esconder implementação.
 
-1. Fase 0 — contratos e testes.
-2. Fase 1 — persistência.
-3. Fase 2 — transcrição.
-4. Fase 3 — organizador Markdown.
-5. Fase 4 — editor e primeira aprovação.
-6. Decidir entrada da Fase 5.
-7. Fase 6 — proposta definitiva.
-8. Fase 7 — preview e segunda aprovação.
-9. Fase 8 — executor.
-10. Fase 9 — correções e aprendizado.
-11. Fase 10 — otimização contínua.
+## 20. Segurança e privacidade
 
+### Autorização
+
+- Toda consulta filtra proprietário no servidor.
+- Referência recebida do modelo nunca é confiável.
+- Executor revalida propriedade dentro da transação.
+- Busca e futuro índice vetorial incluem `ownerId` como filtro obrigatório.
+- Testes tentam acessar projetos, tasks, contexts, proposals e executions de outro usuário.
+
+### Conteúdo sensível
+
+- Notas privadas existentes ficam fora de IA e MCP.
+- Segredos detectados não entram em referência recuperada.
+- Prompt, resposta bruta, transcrição e Markdown não entram em logs comuns.
+- Auditoria registra hashes, IDs, contagens, modelo, versão e resultado técnico.
+- Acesso administrativo a conteúdo bruto exige fluxo separado e auditado.
+- Provedor deve ser configurado para não treinar com dados e usar menor retenção disponível.
+
+### Retenção e exclusão
+
+- Áudio: exclusão imediata após sucesso, descarte ou falha final; órfãos em até 24 horas.
+- Transcrição, Markdown, proposta e origem: permanecem enquanto entrada existir.
+- Exclusão da entrada remove artefatos derivados conforme política do produto.
+- Auditoria remanescente não guarda conteúdo e respeita política de retenção definida para produção.
+- Exclusão de contexto remove candidato de busca imediatamente.
+
+### Prompt injection
+
+- Contextos e textos externos são dados não confiáveis.
+- Nenhuma ferramenta disponível para LLM 1 ou LLM 2.
+- Instruções recuperadas não alteram prompt de sistema.
+- Output strict, allowlist de operações e revalidação no servidor.
+- Fixture maliciosa obrigatória no conjunto de evals.
+
+## 21. Observabilidade e custo
+
+### Métricas por etapa
+
+- Latência p50, p95 e p99.
+- Filas: backlog, tempo de espera e idade do job mais antigo.
+- Tentativas, timeouts, `429`, `5xx`, falhas de schema e resultados obsoletos.
+- Tokens de entrada e saída.
+- Custo estimado por run e por proprietário.
+- Taxa de aprovação sem edição.
+- Campos editados no preview.
+- Taxa de `UNRESOLVED`.
+- Projeto corrigido pelo usuário.
+- Duplicidades detectadas e perdidas.
+- Conversões posteriores das entidades.
+- Áudios órfãos.
+
+### Correlação
+
+Toda operação usa:
+
+- `correlationId`.
+- `aiRunId`.
+- `jobId`.
+- `promptVersion`.
+- `model`.
+- hashes dos artefatos.
+
+### Alertas
+
+- Crescimento contínuo do backlog.
+- Worker sem heartbeat.
+- Falha repetida de provedor.
+- Aumento de resultado obsoleto.
+- Áudio não excluído.
+- Violação de orçamento.
+- Falha de auditoria transacional.
+
+## 22. Evals e política de promoção
+
+Evals começam na Fase 0, não no fim.
+
+### Corpus
+
+- Entradas reais anonimizadas.
+- Texto curto e longo dentro do limite.
+- Áudio curto e reunião.
+- Conteúdo repetitivo e desorganizado.
+- Datas relativas em `America/Sao_Paulo`.
+- Várias entidades e vários projetos.
+- Ambiguidade legítima.
+- Duplicidade provável.
+- Contexto malicioso.
+- Nota privada presente no banco, mas proibida no prompt.
+
+### Medidas
+
+- Cobertura de fatos no Markdown.
+- Fato inventado pelo LLM 1.
+- Precisão de tipo, projeto e datas.
+- Recall das referências.
+- Duplicidades não detectadas.
+- Edição humana necessária.
+- Variação entre tentativas.
+- Latência e custo.
+- Estado final criado, não somente texto do modelo.
+
+### Gate
+
+- Baseline registrado antes do primeiro prompt de produção.
+- Mudança de modelo, prompt, schema ou recuperação roda corpus completo.
+- Qualquer vazamento entre proprietários, criação antes de aprovação, duplicidade por concorrência ou perda de conteúdo bloqueia promoção.
+- Metas numéricas de precisão, custo e latência são definidas após baseline e versionadas neste documento ou em configuração de release.
+
+## 23. Estratégia TDD
+
+Cada fase começa com teste falhando. Antes de implementar cada teste, PR ou commit deve registrar:
+
+1. comportamento importante protegido;
+2. falha ou regressão real detectada;
+3. impacto para usuário ou negócio.
+
+Refatoração só ocorre quando necessária para passar contrato ou remover duplicação diretamente criada pela fase.
+
+### Matriz mínima de testes
+
+| ID | Comportamento protegido | Regressão detectada | Impacto |
+|---|---|---|---|
+| H01 | Nenhuma entidade antes das duas aprovações | Job ou rota cria entidade antecipadamente | Perda de controle do usuário |
+| H02 | Texto removido não reaparece | LLM 2 usa transcrição ou revisão antiga | Criação de conteúdo rejeitado |
+| H03 | Texto adicionado chega ao LLM 2 | Job usa Markdown gerado, não editado | Intenção do usuário ignorada |
+| H04 | Uma reunião gera reunião e tasks relacionadas | Limite de uma entidade por tópico | Informação incompleta |
+| H05 | Resultado de job antigo é rejeitado | Job sobrescreve revisão nova | Corrupção e quebra de confiança |
+| H06 | Aprovação concorrente cria uma execução | Race entre dois cliques | Duplicidade de entidades |
+| H07 | Execução falha reverte tudo | Escrita parcial fora da transação | Base inconsistente |
+| H08 | Busca respeita proprietário | Filtro ausente em uma consulta | Vazamento de dados |
+| H09 | Referência maliciosa não muda instruções | Prompt injection via contexto | Ação indevida |
+| H10 | Nota privada não entra no prompt | Inclusão acidental na recuperação | Exposição LGPD |
+| H11 | Entrada grande nunca é truncada | Corte silencioso de conteúdo | Perda de decisão ou tarefa |
+| H12 | Retry usa snapshot exato | Retry consulta versão mais nova ou antiga | Resultado não reproduzível |
+| H13 | Round-trip do editor mantém hash e conteúdo | Conversão WYSIWYG perde Markdown | Informação alterada sem aviso |
+| H14 | Timeout cancela chamada e mantém lease correta | Chamada continua após timeout | Cobrança e execução duplicadas |
+| H15 | Descarte cancela jobs e apaga áudio | Worker ressuscita entrada descartada | Violação de privacidade |
+| H16 | Áudio é excluído após transcrição | Storage órfão | Retenção indevida |
+| H17 | Referência removida bloqueia execução | Executor confia em preview antigo | Relação inválida |
+| H18 | `UNRESOLVED` não força invenção | Modelo cria dado sem evidência | Informação falsa |
+| H19 | Dependências inválidas bloqueiam aprovação | Item removido deixa grafo quebrado | Execução inconsistente |
+| H20 | Auditoria confirma junto da entidade | Audit log ocorre fora da transação | Rastreabilidade incompleta |
+
+### Escopo dos testes automatizados
+
+- Somente testes unitários.
+- Schemas, hashes, transições, ranking, grafo, políticas e serviços são testados isoladamente.
+- Repositórios, provedores, storage, relógio e concorrência são simulados por fakes ou mocks controlados.
+- Adapters de STT/LLM são validados por unidade com respostas e erros simulados.
+- Componentes de UI são testados por unidade, sem navegador completo.
+- Não criar testes E2E nem suíte automatizada dependente de banco, rede, browser ou provedor real.
+- Funcionamento integrado é verificado por build, typecheck e validação manual dirigida do fluxo real.
+
+## 24. Plano de implementação
+
+### Fase 0 — Contratos e fixtures
+
+Testes primeiro:
+
+- H01, H02, H03, H04, H11 e H18 como testes de aceitação falhando.
+- Fixtures anonimizadas e prompt injection.
+- Schemas Zod versionados.
+- Máquina de estados e transições permitidas.
+- Cálculo de orçamento de tokens.
+
+Entrega:
+
+- contratos TypeScript;
+- corpus inicial;
+- baseline do fluxo atual;
+- nenhuma mudança de produção habilitada.
+
+### Fase 1 — Persistência e migração
+
+Testes primeiro:
+
+- imutabilidade de revisões;
+- owner isolation;
+- concorrência otimista;
+- idempotency keys;
+- cascata e preservação de legado.
+
+Todos estes testes são unitários, usando repositórios fake. Migration e schema são validados por `prisma validate` e build, sem suíte de integração.
+
+Implementação:
+
+- novos modelos e migration;
+- `Meeting` e relações;
+- `AiRun`, revisões, approvals, execution, origin e attempts;
+- extensão segura de `Job`;
+- feature flag desligada.
+
+### Fase 2 — Orquestração e fila
+
+Testes primeiro:
+
+- H05, H06, H12, H14 e H15.
+- retry, cancelamento, heartbeat e stale result.
+
+Implementação:
+
+- job types novos;
+- claim atômico;
+- heartbeat e `AbortSignal`;
+- version check antes/depois do provedor;
+- endpoint de retry e descarte.
+
+### Fase 3 — Transcrição
+
+Testes primeiro:
+
+- H16;
+- MIME inválido, arquivo vazio, limite, retry e reprocessamento;
+- exclusão em sucesso, falha final e descarte.
+
+Implementação:
+
+- adapter STT;
+- `TranscriptRevision`;
+- cleanup job e sweeper;
+- métricas técnicas.
+
+### Fase 4 — LLM 1 e editor
+
+Testes primeiro:
+
+- H02, H03, H11 e H13;
+- preservação de datas, nomes, incertezas e conteúdo não acionável.
+
+Implementação:
+
+- prompt organizador;
+- adapter versionado;
+- validação do Markdown;
+- editor componentizado;
+- autosave e aprovação por hash.
+
+### Fase 5 — Recuperação obrigatória
+
+Testes primeiro:
+
+- H08, H09, H10 e busca de duplicidade;
+- ranking e limites determinísticos.
+
+Implementação:
+
+- `RetrievalProvider`;
+- busca exata e PostgreSQL full-text;
+- snapshot de referências;
+- sanitização e marcação `REFERENCE_ONLY`.
+
+### Fase 6 — LLM 2 e proposta
+
+Testes primeiro:
+
+- H04, H18 e H19;
+- schemas por entidade;
+- referências locais, evidências, confiança e ciclos.
+
+Implementação:
+
+- prompt materializador;
+- strict JSON;
+- `ProposalRevision` e `ProposalItem`;
+- diff IA versus usuário.
+
+### Fase 7 — Preview e executor
+
+Testes primeiro:
+
+- H01, H06, H07, H17, H19 e H20;
+- edição por tipo, remoção e dependências.
+
+Implementação:
+
+- cards compartilhados em modo proposta;
+- edição e segunda aprovação;
+- executor topológico transacional;
+- origem e auditoria na mesma transação.
+
+### Fase 8 — Segurança, evals e rollout
+
+Testes primeiro:
+
+- suíte completa de autorização;
+- carga concorrente de workers;
+- corpus de eval completo.
+
+Testes permanecem unitários: autorização e concorrência usam fakes determinísticos; corpus roda sobre funções/adapters isolados.
+
+Implementação:
+
+- dashboards e alertas;
+- limites por proprietário/provedor;
+- feature flag por usuário;
+- documentação operacional;
+- rollout gradual.
+
+### Fase 9 — Pós-MVP
+
+Somente após métricas reais:
+
+- busca vetorial;
+- chunking;
+- aprendizado com correções;
+- conversões adicionais entre entidades;
+- fila dedicada;
+- execução parcial opcional.
+
+## 25. Migração do fluxo atual
+
+Estado atual usa `InboxItem.status`, `InboxItem.suggestion`, relação única `Task.sourceInboxId` e job `ai.classify`.
+
+Migração deve ser aditiva:
+
+1. Criar tabelas novas sem remover colunas atuais.
+2. Adicionar `Meeting`.
+3. Preservar `sourceInboxId` para registros legados.
+4. Usar `EntityOrigin` para runs v2.
+5. Dividir `ai.classify` em `ai.organize`, `ai.retrieve` e `ai.materialize`.
+6. Manter confirmação antiga para entradas legadas já em revisão.
+7. Direcionar novas entradas ao v2 somente com feature flag.
+8. Não fazer backfill de propostas antigas sem necessidade.
+9. Remover campos legados somente em fase posterior, com migration separada e validação de ausência de uso.
+
+## 26. Rollout e rollback
+
+### Rollout
+
+1. Rodar migrations com feature flag desligada.
+2. Publicar web e worker compatíveis com legado e v2.
+3. Validar health check, fila e migrations.
+4. Habilitar conta de teste.
+5. Rodar corpus unitário com fixtures de texto.
+6. Validar manualmente fluxo real de áudio e confirmar exclusão do arquivo.
+7. Monitorar custo, latência, erros, stale results e auditoria.
+8. Habilitar usuário real escolhido.
+9. Expandir somente após gate dos evals.
+
+### Rollback
+
+- Desligar feature flag impede novos runs v2.
+- Jobs v2 pendentes são cancelados, não convertidos para legado.
+- Runs existentes permanecem legíveis.
+- Fluxo legado continua disponível durante janela de estabilização.
+- Rollback não apaga tabelas nem artefatos.
+- Migration destrutiva fica proibida durante estabilização.
+
+## 27. Definição de pronto
+
+### Funcional
+
+- Texto e áudio completam fluxo até criação.
+- Markdown pode ser editado e aprovado.
+- Proposta única pode conter várias entidades e projetos.
+- Preview permite editar, remover e trocar tipo.
+- `UNRESOLVED` funciona sem invenção.
+- Reload não perde estado.
+
+### Integridade
+
+- Zero entidade antes da segunda aprovação.
+- Clique concorrente não duplica execução.
+- Falha no meio não deixa escrita parcial.
+- Job antigo nunca substitui revisão nova.
+- Cada entidade criada possui origem rastreável.
+
+### Segurança
+
+- Zero acesso cruzado entre proprietários na suíte.
+- Nota privada nunca aparece em prompt ou snapshot de busca.
+- Prompt injection das fixtures não altera operação permitida.
+- Áudio é excluído dentro da política.
+- Logs não contêm transcrição, Markdown, proposta bruta, token ou segredo.
+
+### Operação
+
+- Worker possui heartbeat, timeout cancelável e retry observável.
+- Backlog, latência, tokens, custo e erros possuem métricas.
+- Alertas principais foram exercitados.
+- Rollback por feature flag foi testado.
+
+### Qualidade
+
+- `npm test` passa.
+- `npm run typecheck` passa.
+- `npm run build` passa.
+- Suíte unitária crítica passa.
+- Fluxo real possui validação manual dirigida registrada.
+- Corpus de eval registra baseline e resultado da versão promovida.
+- Mudança respeita escopo da fase e evita refatoração não necessária.
+
+## 28. Ordem final de execução
+
+1. Contratos, testes e evals iniciais.
+2. Persistência versionada e migration aditiva.
+3. Orquestração, fila, retries e concorrência.
+4. Transcrição e retenção.
+5. LLM 1 e editor.
+6. Busca exata e full-text.
+7. LLM 2 e proposta estruturada.
+8. Preview e executor transacional.
+9. Segurança, observabilidade e rollout.
+10. Vector, chunking e aprendizado somente após métricas.

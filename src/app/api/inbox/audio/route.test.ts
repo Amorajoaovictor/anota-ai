@@ -10,6 +10,10 @@ const fakes = vi.hoisted(() => ({
   storage: undefined as any,
   maxUploadBytes: 1024,
   drainJobs: vi.fn().mockResolvedValue(undefined),
+  harnessEnabled: false,
+  ownerAllowed: true,
+  isHarnessEnabledForOwner: vi.fn(),
+  captureHarnessAudio: vi.fn(),
 }))
 
 vi.mock('../../../../lib/auth/server', () => ({ requireCurrentUserId: fakes.requireCurrentUserId }))
@@ -24,6 +28,18 @@ vi.mock('../../../../server/storage', () => ({
   getMaxUploadBytes: () => fakes.maxUploadBytes,
 }))
 vi.mock('../../../../server/jobs/runner', () => ({ drainJobs: fakes.drainJobs }))
+vi.mock('../../../../server/ai/harness/config', () => ({
+  readHarnessV2Config: () => ({
+    enabled: fakes.harnessEnabled,
+    ownerAllowlist: [],
+    maxProposalItems: 100,
+    maxMarkdownCharacters: 50_000,
+    maxAudioBytes: 1024,
+    timeouts: { transcriptionMs: 120_000 },
+  }),
+  isHarnessEnabledForOwner: fakes.isHarnessEnabledForOwner,
+}))
+vi.mock('../../../../server/ai/harness/capture', () => ({ captureHarnessAudio: fakes.captureHarnessAudio }))
 
 import { POST } from './route'
 
@@ -38,6 +54,14 @@ describe('POST /api/inbox/audio', () => {
     fakes.storage = createMemoryStorage()
     fakes.maxUploadBytes = 1024
     fakes.drainJobs.mockClear()
+    fakes.harnessEnabled = false
+    fakes.ownerAllowed = true
+    fakes.isHarnessEnabledForOwner.mockReset().mockImplementation(() => fakes.harnessEnabled && fakes.ownerAllowed)
+    fakes.captureHarnessAudio.mockReset().mockResolvedValue({
+      kind: 'created',
+      inboxItem: { id: 'inbox-v2', status: 'TRANSCRIBING', aiRuns: [{ id: 'run-1' }] },
+      aiRun: { id: 'run-1', status: 'TRANSCRIBING' },
+    })
   })
 
   it('recusa envio sem sessão', async () => {
@@ -89,5 +113,44 @@ describe('POST /api/inbox/audio', () => {
       }),
     }))
     expect(fakes.storage.entries.size).toBe(1)
+  })
+
+  /**
+   * Protege: feature flag envia audio novo ao run versionado, preservando legado desligado.
+   * Detecta: texto usando v2 enquanto audio continua ai.classify antigo.
+   * Impacto: usuario recebe fluxos de aprovacao diferentes conforme formato da entrada.
+   */
+  it('usa captura de audio v2 quando flag esta habilitada', async () => {
+    fakes.harnessEnabled = true
+
+    const response = await POST(multipartRequest(url, audio(), { text: 'legenda' }), undefined)
+
+    expect(response.status).toBe(201)
+    await expect(response.json()).resolves.toEqual({
+      inboxItem: { id: 'inbox-v2', status: 'TRANSCRIBING', aiRuns: [{ id: 'run-1' }] },
+      aiRun: { id: 'run-1', status: 'TRANSCRIBING' },
+    })
+    expect(fakes.captureHarnessAudio).toHaveBeenCalledWith(
+      expect.anything(), expect.anything(), 'user-1',
+      expect.objectContaining({ contentType: 'audio/webm', caption: 'legenda' }),
+      expect.anything(),
+    )
+    expect(fakes.inboxCreate).not.toHaveBeenCalled()
+  })
+
+  /**
+   * Protege: audio respeita mesma allowlist por owner do texto.
+   * Detecta: rota de audio verificando apenas master switch.
+   * Impacto: conta fora do rollout entra no v2 pelo microfone.
+   */
+  it('mantem audio legado para owner fora da allowlist', async () => {
+    fakes.harnessEnabled = true
+    fakes.ownerAllowed = false
+
+    const response = await POST(multipartRequest(url, audio()), undefined)
+
+    expect(response.status).toBe(201)
+    expect(fakes.captureHarnessAudio).not.toHaveBeenCalled()
+    expect(fakes.inboxCreate).toHaveBeenCalled()
   })
 })

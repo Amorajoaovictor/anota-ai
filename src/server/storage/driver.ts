@@ -2,6 +2,7 @@ export type StorageDriver = {
   put(key: string, bytes: Uint8Array): Promise<void>
   read(key: string): Promise<Uint8Array | null>
   delete(key: string): Promise<void>
+  list(prefix: string): Promise<Array<{ key: string; updatedAt: Date }>>
 }
 
 const invalidKey = /(^\/)|(^[a-zA-Z]:)|(\\)|(\.\.)/
