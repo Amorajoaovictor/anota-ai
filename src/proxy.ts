@@ -25,5 +25,5 @@ export const config = {
    * O manifest e o ícone ficam de fora porque o navegador os busca sem credencial:
    * atrás do guard, a instalação como PWA receberia o HTML do login.
    */
-  matcher: ['/((?!api|_next|favicon.ico|icon.svg|manifest.webmanifest).*)'],
+  matcher: ['/((?!api|_next|favicon.ico|icon.svg|manifest.webmanifest|impeccable-preview).*)'],
 }

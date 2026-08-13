@@ -1,10 +1,15 @@
 'use client'
 
 import {
+  Archive,
   ArrowLeft,
+  CalendarBlank,
+  CaretDown,
   Check,
   CheckCircle,
+  FileAudio,
   FileText,
+  Flag,
   FloppyDisk,
   Link as LinkIcon,
   ListBullets,
@@ -248,47 +253,91 @@ function ConsolidatedHarnessReview({ view, client, inboxItem, notify, onBack, on
     />
     {processing && <InlineProcessingBanner view={view} client={client} inboxItem={inboxItem} onViewChange={onViewChange} notify={notify} />}
     {failed && <InlineFailedBanner view={view} client={client} inboxItem={inboxItem} onViewChange={onViewChange} notify={notify} />}
-    <TranscriptSection view={view} inboxItem={inboxItem} defaultOpen={markdownStage} />
-    {markdownRevision && (markdownStage
-      ? markdownRevision.source === 'USER'
-        ? <MarkdownContentEditor
+    <div className="harness-split">
+      <aside className="harness-context-panel">
+        <HarnessContextPanel view={view} inboxItem={inboxItem} />
+      </aside>
+      <div className="harness-main-col">
+        {markdownRevision && (markdownStage
+          ? markdownRevision.source === 'USER'
+            ? <MarkdownContentEditor
+              view={view}
+              client={client}
+              inboxItem={inboxItem}
+              notify={notify}
+              onViewChange={onViewChange}
+              onDirtyChange={setContentDirty}
+              autosaveDelayMs={autosaveDelayMs}
+            />
+            : <AutomaticContentPanel view={view} />
+          : <MarkdownContentPanel view={view} client={client} inboxItem={inboxItem} notify={notify} onViewChange={onViewChange} />)}
+        {proposalStage && view.proposalRevision && <ProposalReviewSection
           view={view}
           client={client}
           inboxItem={inboxItem}
           notify={notify}
           onViewChange={onViewChange}
-          onDirtyChange={setContentDirty}
+          projects={projects}
+          onDirtyChange={setProposalDirty}
           autosaveDelayMs={autosaveDelayMs}
-        />
-        : <AutomaticContentPanel view={view} />
-      : <MarkdownContentPanel view={view} client={client} inboxItem={inboxItem} notify={notify} onViewChange={onViewChange} />)}
-    {proposalStage && view.proposalRevision && <ProposalReviewSection
-      view={view}
-      client={client}
-      inboxItem={inboxItem}
-      notify={notify}
-      onViewChange={onViewChange}
-      projects={projects}
-      onDirtyChange={setProposalDirty}
-      autosaveDelayMs={autosaveDelayMs}
-    />}
+        />}
+      </div>
+    </div>
   </div>
-}
 
-function TranscriptSection({ view, inboxItem, defaultOpen }: {
-  view: HarnessView
-  inboxItem: InboxItem
-  defaultOpen: boolean
-}) {
-  const [open, setOpen] = useState(defaultOpen)
-  const text = view.transcript?.text ?? inboxItem.text
-  if (!text) return null
-  return <section className="harness-collapse view-panel">
-    <button type="button" className="harness-collapse-toggle" aria-expanded={open} onClick={() => setOpen((current) => !current)}>
-      <FileText size={18} /><strong>Transcrição original</strong><span>{open ? 'Recolher' : 'Ver transcrição'}</span>
-    </button>
-    {open && <p className="harness-transcript-text">{text}</p>}
+/**
+ * Coluna de contexto da revisão (painel dividido): a fonte original fica
+ * sempre visível ao lado da decisão — transcrição, origem e, quando a
+ * proposta existe, as evidências e duplicidades agregadas dos itens.
+ */
+function HarnessContextPanel({ view, inboxItem }: { view: HarnessView; inboxItem: InboxItem }) {
+  const transcriptText = view.transcript?.text ?? inboxItem.text
+  const proposal = view.proposalRevision?.proposal
+
+  const evidence = useMemo(() => {
+    if (!proposal) return []
+    const seen = new Set<string>()
+    const quotes: string[] = []
+    for (const item of proposal.items) {
+      for (const entry of item.evidence) {
+        if (!seen.has(entry.quote)) { seen.add(entry.quote); quotes.push(entry.quote) }
+      }
+    }
+    return quotes
+  }, [proposal])
+
+  const duplicates = useMemo(() => {
+    if (!proposal) return []
+    const seen = new Set<string>()
+    const candidates: string[] = []
+    for (const item of proposal.items) {
+      for (const candidate of item.duplicateCandidates) {
+        if (!seen.has(candidate)) { seen.add(candidate); candidates.push(candidate) }
+      }
+    }
+    return candidates
+  }, [proposal])
+
+  return <section className="harness-context">
+    <div className="hcp-heading"><FileText size={19} /><strong>Entrada original</strong></div>
+    <div className="hcp-block">
+      <small>Origem</small>
+      <span className="hcp-origin"><FileAudio size={15} />{inboxItem.source} · {inboxItem.date}</span>
+    </div>
+    {transcriptText && <div className="hcp-block">
+      <small>Transcrição</small>
+      <p className="hcp-transcript">{transcriptText}</p>
+    </div>}
+    {evidence.length > 0 && <div className="hcp-block">
+      <small>Por que essa classificação?</small>
+      <div className="hcp-evidence">{evidence.map((quote) => <p key={quote}><CheckCircle size={15} weight="fill" />{quote}</p>)}</div>
+    </div>}
+    {duplicates.length > 0 && <div className="hcp-block">
+      <small>Possível duplicidade</small>
+      <div className="hcp-duplicates">{duplicates.map((candidate) => <span key={candidate}>{candidate}</span>)}</div>
+    </div>}
   </section>
+}
 }
 
 function AutomaticContentPanel({ view }: { view: HarnessView }) {
@@ -539,6 +588,11 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
   const [saveSequence, setSaveSequence] = useState(0)
   const saveInFlightRef = useRef(false)
   const proposalProjects = useMemo(() => getProposalProjectOptions(projects, draft), [draft, projects])
+  const dependencyTitlesById = useMemo(() => {
+    const titles = new Map<string, string>()
+    for (const item of draft.items) titles.set(item.id, proposalItemTitle(item))
+    return titles
+  }, [draft.items])
   const selectedIds = draft.items.filter((item) => selected.has(item.id)).map((item) => item.id)
   const unresolvedGroups = groupUnresolvedItems(draft.unresolved)
   const signature = proposalSignature(draft, selectedIds)
@@ -660,6 +714,7 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
         projects={proposalProjects}
         selected={selected.has(item.id)}
         selectionLocked={draft.items.some((candidate) => selected.has(candidate.id) && candidate.dependsOn.includes(item.id))}
+        dependencyTitles={item.dependsOn.map((id) => dependencyTitlesById.get(id) ?? id)}
         onToggle={() => toggle(item.id)}
         onChange={(next) => patchItem(item.id, next)}
       />)}
@@ -719,32 +774,45 @@ function getProposalProjectOptions(projects: Project[], proposal: HarnessProposa
   return [...new Map([...persisted, ...proposed].map((option) => [option.id, option])).values()]
 }
 
-function ProposalEntityCard({ item, projects, selected, selectionLocked, onToggle, onChange }: {
+function ProposalEntityCard({ item, projects, selected, selectionLocked, dependencyTitles, onToggle, onChange }: {
   item: HarnessProposalV1['items'][number]
   projects: ProposalProjectOption[]
   selected: boolean
   selectionLocked: boolean
+  dependencyTitles: string[]
   onToggle: () => void
   onChange: (item: HarnessProposalV1['items'][number]) => void
 }) {
   const title = proposalItemTitle(item)
   return <article className={`proposal-entity-card entity-${item.entity.toLowerCase()} ${selected ? 'selected' : 'excluded'}`}>
-    <header>
-      <label title={selectionLocked ? 'Remova primeiro os itens que dependem deste.' : undefined}>
+    <header className="proposal-card-head">
+      <label className="proposal-toggle" title={selectionLocked ? 'Remova primeiro os itens que dependem deste.' : undefined}>
         <input type="checkbox" aria-label={`Incluir ${title}`} checked={selected} disabled={selectionLocked} onChange={onToggle} />
+      </label>
+      <span className="proposal-entity-chip">
+        {proposalEntityIcon(item.entity)}
         {isPrimaryProposalEntity(item.entity)
           ? <select aria-label={`Tipo de ${title}`} value={item.entity} onChange={(event) => onChange(convertProposalEntity(item, event.target.value as PrimaryProposalEntity, projects[0]?.id))}>
             <option value="TASK">Tarefa</option><option value="MEETING">Reunião</option><option value="NOTE">Nota privada</option><option value="MILESTONE">Marco</option>
           </select>
           : <strong>{proposalEntityLabel(item.entity)}</strong>}
-      </label>
+        {isPrimaryProposalEntity(item.entity) && <CaretDown size={11} aria-hidden="true" className="proposal-chip-caret" />}
+      </span>
       <ConfidenceFields confidence={item.confidence} />
+      {!selected && <span className="proposal-excluded-tag">Fica de fora</span>}
     </header>
     <ProposalEntityFields item={item} projects={projects} onChange={onChange} />
-    {item.dependsOn.length > 0 && <small className="proposal-dependencies">Depende de: {item.dependsOn.join(', ')}</small>}
-    <div className="proposal-evidence"><small>EVIDÊNCIA NO CONTEÚDO</small>{item.evidence.map((evidence) => <p key={`${evidence.topicId}-${evidence.quote}`}>{evidence.quote}</p>)}</div>
-    {item.duplicateCandidates.length > 0 && <div className="proposal-duplicates"><small>POSSÍVEL DUPLICIDADE</small>{item.duplicateCandidates.map((candidate) => <span key={candidate}>{candidate}</span>)}</div>}
+    {item.dependsOn.length > 0 && <small className="proposal-dependencies"><LinkIcon size={13} />Depende de: {dependencyTitles.join(', ')}</small>}
   </article>
+}
+
+function proposalEntityIcon(entity: HarnessProposalV1['items'][number]['entity']): ReactNode {
+  if (entity === 'TASK') return <CheckCircle size={14} />
+  if (entity === 'MEETING') return <CalendarBlank size={14} />
+  if (entity === 'NOTE') return <NotePencil size={14} />
+  if (entity === 'MILESTONE') return <Flag size={14} />
+  if (entity === 'PROJECT') return <Archive size={14} />
+  return null
 }
 
 function ProposalEntityFields({ item, projects, onChange }: {
@@ -755,67 +823,75 @@ function ProposalEntityFields({ item, projects, onChange }: {
   if (item.entity === 'TASK') {
     const patch = (data: Partial<typeof item.data>) => onChange({ ...item, data: { ...item.data, ...data } })
     const title = item.data.title
-    return <div className="proposal-fields">
-      <label className="proposal-wide">Título<input aria-label={`Título de ${title}`} value={item.data.title} onChange={(event) => patch({ title: event.target.value })} /></label>
-      <ProjectField value={item.data.project} projects={projects} onChange={(project) => patch({ project })} />
-      <label>Módulo<input aria-label={`Módulo de ${title}`} value={item.data.moduleName ?? ''} onChange={(event) => patch({ moduleName: event.target.value || undefined })} /></label>
-      <label>Tipo de demanda<select aria-label={`Tipo de demanda de ${title}`} value={item.data.kind ?? 'TASK'} onChange={(event) => patch({ kind: event.target.value as NonNullable<typeof item.data.kind> })}>
-        <option value="TASK">Tarefa</option><option value="BUG">Bug</option><option value="IMPROVEMENT">Melhoria</option><option value="FEATURE">Funcionalidade</option><option value="DECISION">Decisão</option><option value="EXTERNAL_REQUEST">Solicitação externa</option><option value="FUTURE_IDEA">Ideia futura</option><option value="QUESTION">Pergunta</option>
-      </select></label>
-      <label>Status<select aria-label={`Status de ${title}`} value={item.data.status ?? 'BACKLOG'} onChange={(event) => patch({ status: event.target.value as NonNullable<typeof item.data.status> })}>
-        <option value="BACKLOG">Backlog</option><option value="IN_PROGRESS">Em andamento</option><option value="BLOCKED">Bloqueada</option><option value="IN_REVIEW">Em validação</option><option value="COMPLETED">Concluída</option><option value="CANCELED">Cancelada</option>
-      </select></label>
-      <label>Prioridade<select aria-label={`Prioridade de ${title}`} value={item.data.priority ?? 'P2'} onChange={(event) => patch({ priority: event.target.value as NonNullable<typeof item.data.priority> })}>
-        {['P0', 'P1', 'P2', 'P3'].map((priority) => <option key={priority}>{priority}</option>)}
-      </select></label>
-      <label>Complexidade<select aria-label={`Complexidade de ${title}`} value={item.data.complexity ?? ''} onChange={(event) => patch({ complexity: event.target.value ? Number(event.target.value) : null })}>
-        <option value="">Não informada</option><option value="1">Baixa</option><option value="2">Média</option><option value="3">Alta</option>
-      </select></label>
-      <label>Prazo<input aria-label={`Prazo de ${title}`} type="datetime-local" value={dateTimeInput(item.data.dueAt)} onChange={(event) => patch({ dueAt: dateTimeOutput(event.target.value) })} /></label>
-      <label>Previsão<input aria-label={`Previsão de ${title}`} type="datetime-local" value={dateTimeInput(item.data.forecastAt)} onChange={(event) => patch({ forecastAt: dateTimeOutput(event.target.value) })} /></label>
-      <label className="proposal-wide">Tags<input aria-label={`Tags de ${title}`} value={(item.data.tags ?? []).join(', ')} onChange={(event) => patch({ tags: commaValues(event.target.value) })} placeholder="Ex.: mensal, diretoria" /></label>
-      <label className="proposal-wide">Marcos<input aria-label={`Marcos de ${title}`} value={referenceListInput(item.data.milestones)} onChange={(event) => patch({ milestones: referenceListOutput(event.target.value) })} placeholder="IDs separados por vírgula; use local:id para itens desta proposta" /></label>
-      <label className="proposal-wide">Descrição<textarea value={item.data.description ?? ''} onChange={(event) => patch({ description: event.target.value })} /></label>
-    </div>
+    return <>
+      <input className="proposal-title-input" aria-label={`Título de ${title}`} placeholder="Título da tarefa" value={item.data.title} onChange={(event) => patch({ title: event.target.value })} />
+      <div className="proposal-fields">
+        <ProjectField value={item.data.project} projects={projects} onChange={(project) => patch({ project })} />
+        <label>Módulo<input aria-label={`Módulo de ${title}`} value={item.data.moduleName ?? ''} onChange={(event) => patch({ moduleName: event.target.value || undefined })} /></label>
+        <label>Tipo de demanda<select aria-label={`Tipo de demanda de ${title}`} value={item.data.kind ?? 'TASK'} onChange={(event) => patch({ kind: event.target.value as NonNullable<typeof item.data.kind> })}>
+          <option value="TASK">Tarefa</option><option value="BUG">Bug</option><option value="IMPROVEMENT">Melhoria</option><option value="FEATURE">Funcionalidade</option><option value="DECISION">Decisão</option><option value="EXTERNAL_REQUEST">Solicitação externa</option><option value="FUTURE_IDEA">Ideia futura</option><option value="QUESTION">Pergunta</option>
+        </select></label>
+        <label>Status<select aria-label={`Status de ${title}`} value={item.data.status ?? 'BACKLOG'} onChange={(event) => patch({ status: event.target.value as NonNullable<typeof item.data.status> })}>
+          <option value="BACKLOG">Backlog</option><option value="IN_PROGRESS">Em andamento</option><option value="BLOCKED">Bloqueada</option><option value="IN_REVIEW">Em validação</option><option value="COMPLETED">Concluída</option><option value="CANCELED">Cancelada</option>
+        </select></label>
+        <label>Prioridade<select aria-label={`Prioridade de ${title}`} value={item.data.priority ?? 'P2'} onChange={(event) => patch({ priority: event.target.value as NonNullable<typeof item.data.priority> })}>
+          {['P0', 'P1', 'P2', 'P3'].map((priority) => <option key={priority}>{priority}</option>)}
+        </select></label>
+        <label>Complexidade<select aria-label={`Complexidade de ${title}`} value={item.data.complexity ?? ''} onChange={(event) => patch({ complexity: event.target.value ? Number(event.target.value) : null })}>
+          <option value="">Não informada</option><option value="1">Baixa</option><option value="2">Média</option><option value="3">Alta</option>
+        </select></label>
+        <label>Prazo<input aria-label={`Prazo de ${title}`} type="datetime-local" value={dateTimeInput(item.data.dueAt)} onChange={(event) => patch({ dueAt: dateTimeOutput(event.target.value) })} /></label>
+        <label>Previsão<input aria-label={`Previsão de ${title}`} type="datetime-local" value={dateTimeInput(item.data.forecastAt)} onChange={(event) => patch({ forecastAt: dateTimeOutput(event.target.value) })} /></label>
+        <label className="proposal-wide">Tags<input aria-label={`Tags de ${title}`} value={(item.data.tags ?? []).join(', ')} onChange={(event) => patch({ tags: commaValues(event.target.value) })} placeholder="Ex.: mensal, diretoria" /></label>
+        <label className="proposal-wide">Marcos<input aria-label={`Marcos de ${title}`} value={referenceListInput(item.data.milestones)} onChange={(event) => patch({ milestones: referenceListOutput(event.target.value) })} placeholder="IDs separados por vírgula; use local:id para itens desta proposta" /></label>
+        <label className="proposal-wide">Descrição<textarea value={item.data.description ?? ''} onChange={(event) => patch({ description: event.target.value })} /></label>
+      </div>
+    </>
   }
   if (item.entity === 'MEETING') {
     const patch = (data: Partial<typeof item.data>) => onChange({ ...item, data: { ...item.data, ...data } })
-    return <div className="proposal-fields">
-      <label className="proposal-wide">Título<input value={item.data.title} onChange={(event) => patch({ title: event.target.value })} /></label>
-      <label>Projeto opcional<input value={item.data.project ? projectRefValue(item.data.project) : ''} onChange={(event) => patch({ project: event.target.value ? { existingId: event.target.value } : undefined })} /></label>
-      <label>Início<input type="datetime-local" value={dateTimeInput(item.data.startsAt)} onChange={(event) => patch({ startsAt: dateTimeOutput(event.target.value) ?? item.data.startsAt })} /></label>
-      <label>Fim<input type="datetime-local" value={dateTimeInput(item.data.endsAt)} onChange={(event) => patch({ endsAt: dateTimeOutput(event.target.value) ?? undefined })} /></label>
-      <label>Duração em minutos<input type="number" min="1" max="1440" value={item.data.durationMinutes ?? ''} onChange={(event) => patch({ durationMinutes: event.target.value ? Number(event.target.value) : undefined })} /></label>
-      <label>Fuso<input value={item.data.timezone} onChange={(event) => patch({ timezone: event.target.value })} /></label>
-      <label>Link<input type="url" value={item.data.link ?? ''} onChange={(event) => patch({ link: event.target.value || undefined })} /></label>
-      <label className="proposal-wide">Descrição<textarea value={item.data.description ?? ''} onChange={(event) => patch({ description: event.target.value })} /></label>
-    </div>
+    return <>
+      <input className="proposal-title-input" aria-label={`Título de ${item.data.title}`} placeholder="Título da reunião" value={item.data.title} onChange={(event) => patch({ title: event.target.value })} />
+      <div className="proposal-fields">
+        <label>Projeto opcional<input value={item.data.project ? projectRefValue(item.data.project) : ''} onChange={(event) => patch({ project: event.target.value ? { existingId: event.target.value } : undefined })} /></label>
+        <label>Início<input type="datetime-local" value={dateTimeInput(item.data.startsAt)} onChange={(event) => patch({ startsAt: dateTimeOutput(event.target.value) ?? item.data.startsAt })} /></label>
+        <label>Fim<input type="datetime-local" value={dateTimeInput(item.data.endsAt)} onChange={(event) => patch({ endsAt: dateTimeOutput(event.target.value) ?? undefined })} /></label>
+        <label>Duração em minutos<input type="number" min="1" max="1440" value={item.data.durationMinutes ?? ''} onChange={(event) => patch({ durationMinutes: event.target.value ? Number(event.target.value) : undefined })} /></label>
+        <label>Fuso<input value={item.data.timezone} onChange={(event) => patch({ timezone: event.target.value })} /></label>
+        <label>Link<input type="url" value={item.data.link ?? ''} onChange={(event) => patch({ link: event.target.value || undefined })} /></label>
+        <label className="proposal-wide">Descrição<textarea value={item.data.description ?? ''} onChange={(event) => patch({ description: event.target.value })} /></label>
+      </div>
+    </>
   }
   if (item.entity === 'NOTE') {
     const patch = (data: Partial<typeof item.data>) => onChange({ ...item, data: { ...item.data, ...data } })
-    return <div className="proposal-fields">
-      <label className="proposal-wide">Título<input value={item.data.title} onChange={(event) => patch({ title: event.target.value })} /></label>
-      <ProjectField value={item.data.project} projects={projects} onChange={(project) => patch({ project })} />
-      <label>Task opcional<input value={item.data.task ? projectRefValue(item.data.task) : ''} onChange={(event) => patch({ task: event.target.value ? { existingId: event.target.value } : undefined })} /></label>
-      <label>Privacidade<input value="Privada" readOnly aria-readonly="true" /></label>
-      <label className="proposal-wide">Conteúdo<textarea value={item.data.content} onChange={(event) => patch({ content: event.target.value })} /></label>
-    </div>
+    return <>
+      <input className="proposal-title-input" aria-label={`Título de ${item.data.title}`} placeholder="Título da nota" value={item.data.title} onChange={(event) => patch({ title: event.target.value })} />
+      <div className="proposal-fields">
+        <ProjectField value={item.data.project} projects={projects} onChange={(project) => patch({ project })} />
+        <label>Task opcional<input value={item.data.task ? projectRefValue(item.data.task) : ''} onChange={(event) => patch({ task: event.target.value ? { existingId: event.target.value } : undefined })} /></label>
+        <label>Privacidade<input value="Privada" readOnly aria-readonly="true" /></label>
+        <label className="proposal-wide">Conteúdo<textarea value={item.data.content} onChange={(event) => patch({ content: event.target.value })} /></label>
+      </div>
+    </>
   }
   if (item.entity === 'MILESTONE') {
     const patch = (data: Partial<typeof item.data>) => onChange({ ...item, data: { ...item.data, ...data } })
-    return <div className="proposal-fields">
-      <label className="proposal-wide">Nome<input value={item.data.name} onChange={(event) => patch({ name: event.target.value })} /></label>
-      <ProjectField value={item.data.project} projects={projects} onChange={(project) => patch({ project })} />
-      <label>Início<input type="datetime-local" value={dateTimeInput(item.data.startAt)} onChange={(event) => patch({ startAt: dateTimeOutput(event.target.value) })} /></label>
-      <label>Data-alvo<input type="datetime-local" value={dateTimeInput(item.data.targetAt)} onChange={(event) => patch({ targetAt: dateTimeOutput(event.target.value) ?? item.data.targetAt })} /></label>
-      <label>Status<select value={item.data.status ?? 'PLANNED'} onChange={(event) => patch({ status: event.target.value as NonNullable<typeof item.data.status> })}>
-        <option value="PLANNED">Planejado</option><option value="IN_PROGRESS">Em andamento</option><option value="ACHIEVED">Atingido</option><option value="POSTPONED">Adiado</option><option value="CANCELED">Cancelado</option>
-      </select></label>
-      <label className="proposal-wide">Tasks vinculadas<input value={referenceListInput(item.data.tasks)} onChange={(event) => patch({ tasks: referenceListOutput(event.target.value) })} placeholder="IDs separados por vírgula; use local:id" /></label>
-      <label className="proposal-wide">Descrição<textarea value={item.data.description ?? ''} onChange={(event) => patch({ description: event.target.value })} /></label>
-    </div>
+    return <>
+      <input className="proposal-title-input" aria-label={`Nome de ${item.data.name}`} placeholder="Nome do marco" value={item.data.name} onChange={(event) => patch({ name: event.target.value })} />
+      <div className="proposal-fields">
+        <ProjectField value={item.data.project} projects={projects} onChange={(project) => patch({ project })} />
+        <label>Início<input type="datetime-local" value={dateTimeInput(item.data.startAt)} onChange={(event) => patch({ startAt: dateTimeOutput(event.target.value) })} /></label>
+        <label>Data-alvo<input type="datetime-local" value={dateTimeInput(item.data.targetAt)} onChange={(event) => patch({ targetAt: dateTimeOutput(event.target.value) ?? item.data.targetAt })} /></label>
+        <label>Status<select value={item.data.status ?? 'PLANNED'} onChange={(event) => patch({ status: event.target.value as NonNullable<typeof item.data.status> })}>
+          <option value="PLANNED">Planejado</option><option value="IN_PROGRESS">Em andamento</option><option value="ACHIEVED">Atingido</option><option value="POSTPONED">Adiado</option><option value="CANCELED">Cancelado</option>
+        </select></label>
+        <label className="proposal-wide">Tasks vinculadas<input value={referenceListInput(item.data.tasks)} onChange={(event) => patch({ tasks: referenceListOutput(event.target.value) })} placeholder="IDs separados por vírgula; use local:id" /></label>
+        <label className="proposal-wide">Descrição<textarea value={item.data.description ?? ''} onChange={(event) => patch({ description: event.target.value })} /></label>
+      </div>
+    </>
   }
-  return <div className="proposal-fields proposal-auxiliary"><p>{proposalItemTitle(item)}</p></div>
+  return <p className="proposal-aux-title">{proposalItemTitle(item)}</p>
 }
 
 function ProjectField({ value, projects, onChange }: { value: ProposalProjectReference; projects: ProposalProjectOption[]; onChange: (value: ProposalProjectReference) => void }) {
@@ -870,6 +946,10 @@ function MarkdownPreview({ content }: { content: string }) {
   })}</div>
 }
 
+function InlineError({ children }: { children: ReactNode }) {
+  return <div className="harness-inline-error" role="alert"><WarningCircle size={17} />{children}</div>
+}
+
 function inlineMarkdown(value: string): ReactNode[] {
   const parts = value.split(/(\*\*[^*]+\*\*|\[[^\]]+\]\([^\s)]+\))/g).filter(Boolean)
   return parts.map((part, index) => {
@@ -887,14 +967,13 @@ function ColumnTitle({ icon, title }: { icon: ReactNode; title: string }) {
   return <div className="column-title">{icon}<h2>{title}</h2></div>
 }
 
-function InlineError({ children }: { children: ReactNode }) {
-  return <div className="harness-inline-error" role="alert"><WarningCircle size={17} />{children}</div>
-}
-
 function ConfidenceFields({ confidence }: { confidence: HarnessProposalV1['items'][number]['confidence'] }) {
   const values = Object.values(confidence).filter((value): value is number => typeof value === 'number')
   const lowest = Math.min(...values)
-  return <span className={`proposal-confidence ${lowest < 70 ? 'uncertain' : ''}`}>{lowest}% confiança</span>
+  return <span className={`proposal-confidence ${lowest < 70 ? 'uncertain' : ''}`} title={`Confiança da classificação: ${lowest}%`} aria-label={`Confiança ${lowest}%`}>
+    <span className="proposal-confidence-track" aria-hidden="true"><i style={{ width: `${lowest}%` }} /></span>
+    {lowest}%
+  </span>
 }
 
 function useUnsavedWarning(enabled: boolean) {

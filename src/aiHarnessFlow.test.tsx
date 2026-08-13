@@ -531,4 +531,35 @@ describe('front do harness supervisionado', () => {
     await userEvent.click(screen.getByRole('checkbox', { name: 'Incluir Nova tarefa' }))
     await waitFor(() => expect(screen.getByRole('button', { name: 'Criar 2 itens' })).toBeEnabled())
   })
+
+  /**
+   * Protege: dependências entre itens aparecem pelo título da entidade, nunca pelo id interno.
+   * Regressão real: card mostra "Depende de: task-base" (jargão de máquina) em vez do nome real.
+   * Impacto: usuário não entende a ordem dos itens propostos ou precisa decifrar ids técnicos.
+   */
+  it('mostra dependências pelo título da entidade, não pelo id interno', async () => {
+    const api = client(proposalView)
+    render(<HarnessReviewPanel inboxItem={inbox} client={api} notify={vi.fn()} onBack={vi.fn()} autosaveDelayMs={25} />)
+
+    await screen.findByLabelText('Título de Enviar relatório')
+    expect(screen.getByText('Depende de: Preparar relatório')).toBeInTheDocument()
+    expect(screen.queryByText(/task-base/)).not.toBeInTheDocument()
+  })
+
+  /**
+   * Protege: item desmarcado sinaliza explicitamente que ficará fora da execução.
+   * Regressão real: usuário não percebe que um item editado não será criado.
+   * Impacto: execução final cria menos do que a proposta indicava, sem aviso.
+   */
+  it('sinaliza itens que ficarão de fora da execução', async () => {
+    const api = client(proposalView)
+    render(<HarnessReviewPanel inboxItem={inbox} client={api} notify={vi.fn()} onBack={vi.fn()} autosaveDelayMs={25} />)
+
+    const toggle = await screen.findByRole('checkbox', { name: 'Incluir Enviar relatório' })
+    expect(screen.queryByText('Fica de fora')).not.toBeInTheDocument()
+
+    await userEvent.click(toggle)
+    expect(screen.getByText('Fica de fora')).toBeInTheDocument()
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Criar 1 item' })).toBeEnabled())
+  })
 })

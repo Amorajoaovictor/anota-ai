@@ -1,0 +1,914 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Revisão IA — 3 opções de design · Central de Projetos</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/regular/style.css">
+<link rel="stylesheet" href="https://unpkg.com/@phosphor-icons/web@2.1.1/src/duotone/style.css">
+<style>
+/* ============ tokens (DESIGN.md — Sala de Controle Silenciosa) ============ */
+:root {
+  --bg: #090d0f;
+  --surface-1: #0e1416;
+  --surface-2: #121a1d;
+  --surface-3: #172023;
+  --surface-sunken: #0c1315;
+  --line: #1f2a2e;
+  --line-strong: #2b393e;
+  --text: #eef4f0;
+  --text-2: #b6c2be;
+  --muted: #8b9a9f;
+  --faint: #79888d;
+  --ink: #0c1612;
+  --green: #79dfb2;
+  --green-soft: #79dfb21f;
+  --green-line: #79dfb24d;
+  --green-fill: #16251f;
+  --amber: #f0ad5b;
+  --amber-soft: #2b2116;
+  --amber-line: #7d5a2c;
+  --info: #7fb3ff;
+  --info-soft: #16232c;
+  --info-line: #2f5f7f;
+  --danger: #f3aaaa;
+  --danger-soft: #2b1b1d;
+  --danger-line: #6b3a3d;
+  --r-sm: 6px; --r-md: 10px; --r-lg: 14px; --r-xl: 20px;
+  --gutter: 42px;
+  --font-sans: 'DM Sans', sans-serif;
+  --font-display: 'Space Grotesk', sans-serif;
+  --ease: cubic-bezier(.4, 0, .2, 1);
+  --shadow-1: 0 1px 2px #00000040;
+  --shadow-2: 0 10px 30px -12px #000000b3;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body { background: #05080a; color: var(--text); font: 13px/1.55 var(--font-sans); -webkit-font-smoothing: antialiased; }
+* { scrollbar-width: thin; scrollbar-color: #2b393e #0a0f11; }
+*::-webkit-scrollbar { width: 10px; height: 10px; }
+*::-webkit-scrollbar-track { background: #0a0f11; }
+*::-webkit-scrollbar-thumb { background: #2b393e; border-radius: 5px; border: 2px solid #0a0f11; }
+*::-webkit-scrollbar-thumb:hover { background: #3b4c51; }
+::selection { background: #79dfb233; color: #eef4f0; }
+
+/* ============ barra de decisão ============ */
+.decision-bar {
+  position: sticky; top: 0; z-index: 50;
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 12px 20px;
+  border-bottom: 1px solid #1a2326;
+  background: #0b1012ee; backdrop-filter: blur(10px);
+}
+.decision-bar .db-brand { display: flex; align-items: center; gap: 9px; font: 700 14px var(--font-display); letter-spacing: -.02em; color: #eef4f0; }
+.decision-bar .db-brand i { color: var(--green); font-size: 20px; }
+.db-tabs { display: flex; gap: 4px; padding: 3px; border: 1px solid #1f2a2e; border-radius: 10px; background: #0e1416; }
+.db-tab {
+  border: 0; border-radius: 7px; background: transparent; color: var(--muted);
+  padding: 7px 14px; font: 600 12px var(--font-sans); cursor: pointer;
+  display: inline-flex; align-items: center; gap: 7px;
+}
+.db-tab small { color: #758280; font-weight: 500; }
+.db-tab:hover { color: var(--text-2); }
+.db-tab[aria-pressed="true"] { background: var(--green-fill); color: var(--green); box-shadow: inset 0 0 0 1px var(--green-line); }
+.db-params { display: flex; align-items: center; gap: 10px; margin-left: auto; }
+.db-params label { display: inline-flex; align-items: center; gap: 7px; color: var(--muted); font-size: 11px; }
+.db-params select {
+  border: 1px solid #263237; border-radius: 6px; background: #0e1416; color: var(--text-2);
+  padding: 5px 8px; font: 500 11px var(--font-sans); outline: none;
+}
+.db-params select:focus { border-color: var(--green-line); }
+.db-note { margin-left: auto; color: #758280; font-size: 11px; }
+
+/* ============ shell do app (incumbente) ============ */
+.app-shell { display: flex; min-height: calc(100vh - 51px); }
+.sidebar {
+  width: 228px; flex-shrink: 0; border-right: 1px solid var(--line);
+  padding: 26px 16px 20px; display: flex; flex-direction: column;
+  background: rgba(10,14,16,.76);
+}
+.brand { display: flex; gap: 12px; align-items: center; font-family: var(--font-display); font-weight: 700; font-size: 18px; line-height: 1.1; margin: 0 8px 44px; color: var(--text); }
+.brand-mark { color: var(--green); }
+.nav-list { display: grid; gap: 14px; }
+.nav-group { display: grid; gap: 5px; }
+.nav-group-label { margin: 0 12px 5px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase; color: #788286; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  border: 0; border-radius: 7px; background: transparent; color: #9aa7a4;
+  padding: 9px 12px; text-align: left; font: 500 12.5px var(--font-sans); cursor: pointer;
+  transition: background .16s var(--ease), color .16s var(--ease);
+}
+.nav-item i { font-size: 19px; }
+.nav-item:hover { background: #16201f; color: var(--text-2); }
+.nav-item.active { background: linear-gradient(90deg, #17282300, #16211f); box-shadow: inset 2px 0 0 var(--green); color: var(--text); }
+.nav-item.active i { color: var(--green); }
+.recent { margin-top: auto; padding-top: 18px; }
+.recent > p { margin: 0 12px 7px; font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: #788286; }
+.recent-project {
+  display: flex; align-items: center; gap: 9px; width: 100%;
+  border: 0; border-radius: 7px; background: transparent; color: #9aa7a4;
+  padding: 8px 12px; text-align: left; font-size: 12px; cursor: pointer;
+}
+.recent-project i { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.recent-project small { margin-left: auto; color: #758280; font-size: 10px; }
+.profile { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 13px 8px 0; border-top: 1px solid var(--line); }
+.avatar { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: #1c2a26; color: var(--green); font: 700 11px var(--font-sans); }
+.profile strong { display: block; font-size: 11.5px; color: var(--text-2); }
+.profile small { color: #758280; font-size: 10px; }
+.main-content { flex: 1; min-width: 0; }
+.topbar { height: 68px; border-bottom: 1px solid var(--line); display: flex; align-items: center; padding: 0 var(--gutter); gap: 24px; }
+.search {
+  margin-left: auto; width: min(310px, 35vw); height: 35px;
+  border: 1px solid #273337; border-radius: 7px;
+  display: flex; align-items: center; gap: 8px; padding: 0 11px;
+  color: #748086; font-size: 12px; background: transparent; cursor: pointer;
+}
+.search i { font-size: 17px; }
+.search kbd { margin-left: auto; background: #1b2428; padding: 3px 5px; border-radius: 4px; color: #9ba7a9; font-size: 10px; }
+.top-actions { display: flex; align-items: center; gap: 18px; }
+.top-actions button { position: relative; border: 0; background: none; color: #9aa5a7; cursor: pointer; }
+.top-actions button i { font-size: 21px; }
+.top-actions b { position: absolute; right: -6px; top: -8px; font-size: 9px; color: var(--green); background: #1d3b30; border: 1px solid #315746; border-radius: 10px; padding: 1px 5px; }
+.topbar-create {
+  display: inline-flex; gap: 7px; align-items: center; padding: 8px 13px;
+  border: 1px solid var(--green-line); border-radius: 8px; background: #16211d;
+  color: var(--green); font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.topbar-create:hover { background: #1d2e27; }
+
+/* ============ conteúdo — base comum ============ */
+.content { padding-bottom: 44px; }
+.back-row { display: flex; align-items: center; gap: 7px; max-width: 1480px; margin: 26px auto 0; padding: 0 var(--gutter); }
+.back-context { display: inline-flex; gap: 7px; align-items: center; border: 0; background: transparent; color: #93a09e; font-size: 11.5px; cursor: pointer; }
+.back-context:hover { color: var(--green); }
+.page-head {
+  display: flex; align-items: flex-end; justify-content: space-between;
+  max-width: 1480px; margin: auto; padding: 26px var(--gutter) 20px;
+}
+.page-head .eyebrow { margin: 0 0 6px; color: #758280; font-size: 10px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.page-head h1 { margin: 0; font: 700 30px var(--font-display); letter-spacing: -.03em; color: var(--text); }
+.page-head p { margin: 8px 0 0; color: var(--muted); font-size: 13px; max-width: 620px; }
+.confidence-card {
+  display: grid; grid-template-columns: 1fr auto; gap: 7px;
+  width: 190px; padding: 13px 15px;
+  border: 1px solid #30433c; border-radius: 9px; background: #121d19; flex-shrink: 0;
+}
+.confidence-card span { color: #99a6a2; font-size: 11px; }
+.confidence-card strong { color: var(--green); font-size: 17px; font-weight: 700; }
+.confidence-card > div { grid-column: 1 / -1; height: 4px; border-radius: 3px; background: #283632; overflow: hidden; }
+.confidence-card i { display: block; height: 100%; background: var(--green); }
+
+/* confiança inline */
+.confidence { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: 10.5px; }
+.confidence b { color: var(--green); font-weight: 700; }
+.confidence .bar { width: 34px; height: 3px; border-radius: 2px; background: #26343a; overflow: hidden; }
+.confidence .bar i { display: block; height: 100%; background: var(--green); }
+
+/* botões base */
+.btn-primary {
+  display: inline-flex; gap: 8px; align-items: center;
+  border: 1px solid var(--green); border-radius: 10px; background: var(--green);
+  color: var(--ink); padding: 11px 17px; font: 700 12.5px var(--font-sans); cursor: pointer;
+  box-shadow: var(--shadow-1);
+}
+.btn-primary:hover { background: #8ad6a8; }
+.btn-primary:disabled { cursor: not-allowed; opacity: .42; box-shadow: none; }
+.btn-ghost {
+  display: inline-flex; gap: 7px; align-items: center;
+  border: 1px solid #35463f; border-radius: 9px; background: #16241f;
+  color: var(--green); padding: 9px 13px; font-size: 11.5px; font-weight: 600; cursor: pointer;
+}
+.btn-ghost:hover { border-color: var(--green); }
+.discard-button { display: inline-flex; gap: 7px; align-items: center; border: 0; background: transparent; color: #9d7777; font-size: 11px; cursor: pointer; }
+.discard-button:hover { color: #e19696; }
+
+/* markdown preview */
+.md h1, .md h2, .md h3 { color: var(--text); font-family: var(--font-display); margin: 12px 0 6px; }
+.md h1 { font-size: 19px; } .md h2 { font-size: 16px; } .md h3 { font-size: 13px; }
+.md p { margin: 6px 0; color: #c6d0cb; font-size: 12px; line-height: 1.6; }
+.md ul { margin: 6px 0; padding-left: 14px; color: #c6d0cb; font-size: 12px; line-height: 1.6; }
+.md strong { color: #edf3ef; }
+.md .md-tag { display: inline-block; border-radius: 5px; background: #1d2f29; color: var(--green); padding: 2px 7px; font-size: 10px; }
+
+/* ================================================================
+   VARIANTE 1 — "Fluxo em destaque" (eixo: hierarquia — etapas e
+   decisão dominam; transcrição recua)
+================================================================ */
+.v1 .steps {
+  list-style: none; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px;
+  max-width: 1480px; margin: 0 auto 22px; padding: 0 var(--gutter);
+}
+.v1 .steps li {
+  display: flex; align-items: center; gap: 10px; min-width: 0;
+  border: 1px solid var(--line); border-radius: 9px; background: #101719;
+  padding: 11px 13px; color: #667376;
+}
+.v1 .steps li > span {
+  flex: 0 0 26px; height: 26px; display: grid; place-items: center;
+  border: 1px solid #344044; border-radius: 50%; font: 600 10px var(--font-display);
+}
+.v1 .steps li > div { min-width: 0; display: grid; gap: 2px; }
+.v1 .steps strong { color: #aab5b1; font: 600 11px var(--font-display); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.v1 .steps small { overflow: hidden; color: #758280; font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
+.v1 .steps li.complete > span { border-color: #315746; color: var(--green); }
+.v1 .steps li.active { border-color: #47705f; background: #14231e; }
+.v1 .steps li.active > span { border-color: var(--green); background: #19392e; color: var(--green); }
+.v1 .steps li.active strong { color: #d4ddd8; }
+.v1 .panel {
+  max-width: 1480px; margin: 0 auto 14px; padding: 0 var(--gutter);
+}
+.v1 .panel > .view-panel { border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); padding: 20px 22px; }
+.v1 .panel-title { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.v1 .panel-title i { color: var(--green); font-size: 19px; }
+.v1 .panel-title h2 { margin: 0; font: 600 15px var(--font-display); }
+.v1 .panel-title .collapse-toggle { margin-left: auto; border: 0; background: none; color: #758280; font-size: 10.5px; cursor: pointer; }
+.v1 .transcript { color: #c6d0cb; font-size: 12.5px; line-height: 1.65; }
+.v1 .summary-row { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+.v1 .summary-row i { color: var(--green); font-size: 16px; }
+.v1 .summary-row span { color: #8f9c99; font-size: 10.5px; line-height: 1.5; }
+.v1 .items { max-width: 1480px; margin: 0 auto; padding: 0 var(--gutter); display: grid; gap: 12px; }
+.v1 .items-head { display: flex; align-items: center; gap: 12px; margin: 8px 0 2px; }
+.v1 .items-head h2 { margin: 0; font: 600 16px var(--font-display); }
+.v1 .items-head span { color: var(--muted); font-size: 11.5px; }
+.v1 .items-head em { margin-left: auto; font-style: normal; color: #758280; font-size: 10.5px; }
+.v1 .entity {
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-1);
+  padding: 18px 20px;
+  transition: border-color .16s var(--ease), opacity .15s;
+}
+.v1 .entity.entity-task { border-left: 3px solid var(--green); }
+.v1 .entity.entity-context { border-left: 3px solid var(--info); }
+.v1 .entity.excluded { opacity: .5; }
+.v1 .entity-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.v1 .entity-head label { display: inline-flex; align-items: center; gap: 9px; color: #e2eae5; font-size: 12.5px; font-weight: 600; }
+.v1 .entity-head input[type='checkbox'] { width: 16px; height: 16px; accent-color: var(--green); }
+.v1 .entity-head .entity-type { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 9px; font-size: 10px; font-weight: 700; }
+.v1 .entity-head .entity-type.task { color: var(--green); background: var(--green-fill); }
+.v1 .entity-head .entity-type.context { color: var(--info); background: var(--info-soft); }
+.v1 .entity-head .confidence { margin-left: auto; }
+.v1 .entity-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.v1 .entity-fields label { display: grid; gap: 6px; color: #82908d; font-size: 9.5px; font-weight: 600; }
+.v1 .entity-fields label.wide { grid-column: 1 / -1; }
+.v1 .entity-fields input, .v1 .entity-fields select, .v1 .entity-fields textarea {
+  width: 100%; min-width: 0; border: 1px solid #334244; border-radius: 7px; background: #0d1416;
+  color: #e2eae5; padding: 9px 10px; outline: none; font: 11.5px var(--font-sans);
+}
+.v1 .entity-fields textarea { min-height: 68px; resize: vertical; line-height: 1.45; }
+.v1 .entity-fields input:focus, .v1 .entity-fields select:focus, .v1 .entity-fields textarea:focus { border-color: var(--green); }
+.v1 .entity-evidence { display: grid; gap: 5px; margin-top: 13px; padding-top: 11px; border-top: 1px solid var(--line); }
+.v1 .entity-evidence small { color: #687578; font-size: 8px; font-weight: 700; letter-spacing: .12em; }
+.v1 .entity-evidence p { margin: 3px 0 0; color: #8f9c99; font-size: 10px; line-height: 1.45; }
+.v1 .entity-evidence p i { color: var(--green); font-style: normal; }
+.v1 .duplicates { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 12px; }
+.v1 .duplicates span { border: 1px solid #62472c; border-radius: 999px; background: #2a2118; color: #e1b87d; padding: 5px 9px; font-size: 9px; }
+.v1 .review-footer {
+  position: sticky; bottom: 0; z-index: 3;
+  display: flex; align-items: center; gap: 14px;
+  max-width: 1480px; margin: 20px auto 0; padding: 15px var(--gutter);
+  border-top: 1px solid var(--line); background: var(--bg);
+}
+.v1 .review-footer > span { margin-left: auto; color: #85918f; font-size: 10px; }
+.v1 .review-footer > span b { color: #c8d2cc; }
+.v1[data-dense="compact"] .entity { padding: 13px 15px; }
+.v1[data-dense="compact"] .entity-fields { gap: 8px; }
+.v1[data-show-evidence="off"] .entity-evidence { display: none; }
+.v1[data-show-evidence="off"] .duplicates { display: none; }
+
+/* ================================================================
+   VARIANTE 2 — "Painel dividido" (eixo: topologia — contexto sticky
+   à esquerda, decisão à direita)
+================================================================ */
+.v2 .split { display: grid; grid-template-columns: 400px minmax(0, 1fr); gap: 22px; align-items: start; max-width: 1480px; margin: 0 var(--gutter); }
+.v2 .context-panel {
+  position: sticky; top: 63px;
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-2);
+  padding: 18px 18px 16px;
+}
+.v2 .context-panel > header { display: flex; align-items: center; gap: 10px; margin-bottom: 13px; }
+.v2 .context-panel > header i { color: var(--green); font-size: 19px; }
+.v2 .context-panel > header strong { font: 600 14px var(--font-display); }
+.v2 .context-panel > header .confidence { margin-left: auto; }
+.v2 .cp-block { margin-bottom: 16px; }
+.v2 .cp-block > small { display: block; margin-bottom: 7px; color: #687578; font-size: 9px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.v2 .cp-transcript { color: #c6d0cb; font-size: 12px; line-height: 1.6; }
+.v2 .cp-origin { display: flex; align-items: center; gap: 8px; color: #758280; font-size: 10.5px; }
+.v2 .cp-origin i { color: var(--green); font-size: 15px; }
+.v2 .cp-evidence { display: grid; gap: 7px; }
+.v2 .cp-evidence p { margin: 0; display: flex; gap: 8px; align-items: flex-start; color: #96a3a1; font-size: 10.5px; line-height: 1.5; }
+.v2 .cp-evidence p i { color: var(--green); font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.v2 .cp-duplicates { display: flex; flex-wrap: wrap; gap: 5px; }
+.v2 .cp-duplicates span { border: 1px solid #62472c; border-radius: 999px; background: #2a2118; color: #e1b87d; padding: 4px 8px; font-size: 9px; }
+.v2 .main-col { min-width: 0; }
+.v2 .md-panel {
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2);
+  padding: 18px 20px; margin-bottom: 16px;
+}
+.v2 .md-panel > header { display: flex; align-items: center; gap: 9px; margin-bottom: 6px; }
+.v2 .md-panel > header i { color: var(--green); font-size: 17px; }
+.v2 .md-panel > header h2 { margin: 0; font: 600 14px var(--font-display); }
+.v2 .md-panel > header .save-state { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; color: var(--green); font-size: 10px; }
+.v2 .entity {
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-1);
+  padding: 16px 18px; margin-bottom: 10px;
+  transition: border-color .16s var(--ease), opacity .15s;
+}
+.v2 .entity.entity-task { border-left: 3px solid var(--green); }
+.v2 .entity.entity-context { border-left: 3px solid var(--info); }
+.v2 .entity.excluded { opacity: .5; }
+.v2 .entity-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.v2 .entity-head label { display: inline-flex; align-items: center; gap: 8px; color: #e2eae5; font-size: 12px; font-weight: 600; }
+.v2 .entity-head input[type='checkbox'] { width: 15px; height: 15px; accent-color: var(--green); }
+.v2 .entity-head .entity-type { display: inline-flex; border-radius: 999px; padding: 3px 8px; font-size: 9.5px; font-weight: 700; }
+.v2 .entity-head .entity-type.task { color: var(--green); background: var(--green-fill); }
+.v2 .entity-head .entity-type.context { color: var(--info); background: var(--info-soft); }
+.v2 .entity-head .confidence { margin-left: auto; }
+.v2 .entity-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.v2 .entity-fields label { display: grid; gap: 5px; color: #82908d; font-size: 9.5px; font-weight: 600; }
+.v2 .entity-fields label.wide { grid-column: 1 / -1; }
+.v2 .entity-fields input, .v2 .entity-fields select, .v2 .entity-fields textarea {
+  width: 100%; min-width: 0; border: 1px solid #334244; border-radius: 6px; background: #0d1416;
+  color: #e2eae5; padding: 8px 9px; outline: none; font: 11px var(--font-sans);
+}
+.v2 .entity-fields textarea { min-height: 60px; resize: vertical; line-height: 1.45; }
+.v2 .entity-fields input:focus, .v2 .entity-fields select:focus, .v2 .entity-fields textarea:focus { border-color: var(--green); }
+.v2 .entity-evidence { display: grid; gap: 4px; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--line); }
+.v2 .entity-evidence small { color: #687578; font-size: 8px; font-weight: 700; letter-spacing: .12em; }
+.v2 .entity-evidence p { margin: 2px 0 0; color: #8f9c99; font-size: 10px; line-height: 1.45; }
+.v2 .entity-evidence p i { color: var(--green); font-style: normal; }
+.v2 .review-footer {
+  position: sticky; bottom: 0; z-index: 3;
+  display: flex; align-items: center; gap: 14px;
+  max-width: 1480px; margin: 18px auto 0; padding: 15px var(--gutter);
+  border-top: 1px solid var(--line); background: var(--bg);
+}
+.v2 .review-footer > span { margin-left: auto; color: #85918f; font-size: 10px; }
+.v2 .review-footer > span b { color: #c8d2cc; }
+.v2[data-show-transcript="off"] .cp-transcript { display: none; }
+.v2[data-show-transcript="off"] .cp-block:first-child > small { display: none; }
+.v2[data-panel-pos="right"] .split { grid-template-columns: minmax(0, 1fr) 400px; }
+.v2[data-panel-pos="right"] .context-panel { order: 2; }
+.v2[data-panel-pos="right"] .main-col { order: 1; }
+
+/* ================================================================
+   VARIANTE 3 — "Console de aprovação" (eixo: densidade/estrutura —
+   proposta tabular, conteúdo colapsável, contagem explícita)
+================================================================ */
+.v3 .capture-bar {
+  max-width: 1480px; margin: 0 auto 18px; padding: 0 var(--gutter);
+  display: flex; align-items: center; gap: 14px;
+  border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface-2);
+  padding: 12px 16px;
+}
+.v3 .capture-bar > i { color: var(--green); font-size: 19px; flex-shrink: 0; }
+.v3 .capture-bar .cb-text { display: grid; gap: 2px; min-width: 0; }
+.v3 .capture-bar .cb-text strong { font: 600 13px var(--font-display); color: #e1e9e4; }
+.v3 .capture-bar .cb-text span { color: var(--muted); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.v3 .capture-bar .cb-origin { display: inline-flex; align-items: center; gap: 6px; color: #758280; font-size: 10px; flex-shrink: 0; }
+.v3 .capture-bar .cb-origin i { color: var(--info); font-size: 14px; }
+.v3 .capture-bar .confidence { margin-left: auto; flex-shrink: 0; }
+.v3 .triage { max-width: 1480px; margin: 0 auto 14px; padding: 0 var(--gutter); }
+.v3 .triage table { width: 100%; border-collapse: collapse; border: 1px solid var(--line); border-radius: 12px; overflow: hidden; background: var(--surface-1); }
+.v3 thead th {
+  text-align: left; color: #7e8c8d; font-size: 10px; letter-spacing: .09em; text-transform: uppercase;
+  padding: 11px 16px; border-bottom: 1px solid var(--line); background: var(--surface-2);
+}
+.v3 tbody td { padding: 13px 16px; border-bottom: 1px solid #1a2427; vertical-align: top; }
+.v3 tbody tr:last-child td { border-bottom: 0; }
+.v3 tbody tr { transition: background .12s var(--ease); }
+.v3 tbody tr:hover { background: var(--surface-2); }
+.v3 tbody tr.excluded { opacity: .52; }
+.v3 .col-check { width: 42px; }
+.v3 .col-check input { width: 15px; height: 15px; accent-color: var(--green); }
+.v3 .col-entity { width: 120px; }
+.v3 .entity-type { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 3px 9px; font-size: 10px; font-weight: 700; }
+.v3 .entity-type.task { color: var(--green); background: var(--green-fill); }
+.v3 .entity-type.context { color: var(--info); background: var(--info-soft); }
+.v3 .col-title { width: 34%; }
+.v3 .col-title p { margin: 0; color: var(--text); font-size: 12.5px; line-height: 1.45; }
+.v3 .col-title small { display: block; margin-top: 3px; color: #758280; font-size: 10px; }
+.v3 .col-proj { width: 26%; }
+.v3 .col-proj .suggestion-row { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.v3 .suggestion-row > span { color: #96a3a1; border-right: 1px solid #334043; padding-right: 7px; font-size: 10.5px; }
+.v3 .suggestion-row > span:last-child { border-right: 0; }
+.v3 .suggestion-row b { color: #cfd9d4; font-weight: 600; }
+.v3 .col-confidence { width: 104px; }
+.v3 .col-evidence { width: 26%; }
+.v3 .col-evidence p { margin: 0; color: #8f9c99; font-size: 10px; line-height: 1.45; }
+.v3 .col-evidence p i { color: var(--green); font-style: normal; }
+.v3 .md-strip {
+  max-width: 1480px; margin: 0 auto 14px; padding: 0 var(--gutter);
+  border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); overflow: hidden;
+}
+.v3 .md-strip > header { display: flex; align-items: center; gap: 9px; padding: 13px 16px; cursor: pointer; }
+.v3 .md-strip > header i { color: var(--green); font-size: 17px; }
+.v3 .md-strip > header h2 { margin: 0; font: 600 13px var(--font-display); }
+.v3 .md-strip > header span { margin-left: auto; color: #758280; font-size: 10px; }
+.v3 .md-strip .md-body { padding: 4px 18px 16px; border-top: 1px solid var(--line); }
+.v3 .review-footer {
+  position: sticky; bottom: 0; z-index: 3;
+  display: flex; align-items: center; gap: 14px;
+  max-width: 1480px; margin: 18px auto 0; padding: 15px var(--gutter);
+  border-top: 1px solid var(--line); background: var(--bg);
+}
+.v3 .review-footer .sel-summary { display: flex; align-items: center; gap: 9px; margin-left: auto; color: #85918f; font-size: 10px; }
+.v3 .review-footer .sel-summary b { color: var(--green); font-size: 13px; }
+.v3[data-show-confidence="off"] .col-confidence { display: none; }
+.v3[data-dense="dense"] tbody td { padding: 9px 16px; }
+.v3[data-dense="dense"] .col-title p { font-size: 12px; }
+.v3[data-show-evidence="off"] .col-evidence { display: none; }
+
+/* ============ modo comparar ============ */
+body[data-mode="compare"] .stage { display: grid; gap: 26px; padding: 22px 26px 46px; }
+body[data-mode="compare"] .variant {
+  border: 1px solid #1f2a2e; border-radius: 14px; background: #070b0d; overflow: hidden;
+}
+body[data-mode="compare"] .variant::before {
+  display: flex; align-items: center; gap: 9px;
+  padding: 9px 15px; border-bottom: 1px solid #1f2a2e;
+  font: 600 11px var(--font-sans); letter-spacing: .06em; text-transform: uppercase; color: #7e8c8d;
+}
+body[data-mode="compare"] .variant[data-variant="1"]::before { content: 'V1 — Fluxo em destaque'; }
+body[data-mode="compare"] .variant[data-variant="2"]::before { content: 'V2 — Painel dividido'; }
+body[data-mode="compare"] .variant[data-variant="3"]::before { content: 'V3 — Console de aprovação'; }
+.variant { display: none; }
+body[data-mode="single"] .variant[data-v-active="1"] { display: block; }
+body[data-mode="single"] .variant[data-v-active="2"] { display: block; }
+body[data-mode="single"] .variant[data-v-active="3"] { display: block; }
+body[data-mode="compare"] .variant { display: block; }
+
+/* ============ responsivo (alinhado ao incumbente) ============ */
+@media (max-width: 1080px) {
+  :root { --gutter: 24px; }
+  .sidebar { width: 192px; }
+  .v2 .split { grid-template-columns: 1fr; }
+  .v2 .context-panel { position: static; }
+}
+@media (max-width: 760px) {
+  .app-shell { display: block; }
+  .sidebar { width: 100%; min-height: auto; height: auto; padding: 13px 16px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .brand, .recent, .profile { display: none; }
+  .nav-list { display: flex; overflow-x: auto; gap: 10px; -webkit-overflow-scrolling: touch; scrollbar-width: none; mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 16px, #000 calc(100% - 16px), transparent); }
+  .nav-list::-webkit-scrollbar { display: none; }
+  .nav-group { display: flex; gap: 4px; flex-shrink: 0; }
+  .nav-group-label { display: none; }
+  .nav-item { flex: 0 0 auto; width: auto; padding: 9px 11px; }
+  .nav-item.active { box-shadow: none; background: var(--green-fill); }
+  .topbar { height: 58px; padding: 0 16px; gap: 12px; }
+  .topbar .search { display: none; }
+  .topbar-create span { display: none; }
+  .topbar-create { padding: 8px 10px; }
+  .page-head { padding: 20px 16px 16px; flex-direction: column; align-items: flex-start; gap: 12px; }
+  .page-head h1 { font-size: 24px; }
+  .page-head .confidence-card { width: 100%; }
+  .back-row { padding: 0 16px; margin-top: 18px; }
+  .v1 .steps { grid-template-columns: 1fr 1fr; padding: 0 16px; }
+  .v1 .panel, .v1 .items { padding: 0 16px; }
+  .v1 .entity-fields { grid-template-columns: 1fr; }
+  .v1 .entity-fields label.wide { grid-column: auto; }
+  .v2 .split { margin: 0 16px; }
+  .v2 .entity-fields { grid-template-columns: 1fr; }
+  .v2 .entity-fields label.wide { grid-column: auto; }
+  .v3 .capture-bar, .v3 .triage, .v3 .md-strip { padding-left: 16px; padding-right: 16px; margin-left: 0; margin-right: 0; }
+  .v3 .triage { overflow-x: auto; }
+  .v3 .triage table { min-width: 700px; }
+  .v1 .review-footer, .v2 .review-footer, .v3 .review-footer { padding-left: 16px; padding-right: 16px; margin-left: 16px; margin-right: 16px; flex-wrap: wrap; }
+  .v1 .review-footer > span, .v2 .review-footer > span { margin-left: 0; }
+  body[data-mode="compare"] .stage { padding: 14px 12px 34px; }
+  .db-params { flex-wrap: wrap; }
+  .db-params label { white-space: nowrap; }
+  .db-params select { max-width: 130px; }
+}
+</style>
+</head>
+<body data-mode="single">
+
+<div class="decision-bar">
+  <div class="db-brand"><i class="ph-duotone ph-sparkle"></i> Revisão IA · 3 opções</div>
+  <div class="db-tabs" role="tablist">
+    <button class="db-tab" data-target="1" aria-pressed="true"><i class="ph ph-stack"></i>V1 <small>Fluxo em destaque</small></button>
+    <button class="db-tab" data-target="2" aria-pressed="false"><i class="ph ph-columns"></i>V2 <small>Painel dividido</small></button>
+    <button class="db-tab" data-target="3" aria-pressed="false"><i class="ph ph-table"></i>V3 <small>Console</small></button>
+  </div>
+  <div class="db-params"></div>
+  <button class="db-tab db-compare" data-mode-target="compare"><i class="ph ph-square-split-horizontal"></i>Comparar</button>
+</div>
+
+<div class="stage">
+
+<!-- ================= VARIANTE 1 — Fluxo em destaque ================= -->
+<div class="variant" data-variant="1" data-v-active="1">
+<div class="v1 app-shell" data-dense="comfortable" data-show-evidence="on">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark"><i class="ph-duotone ph-projector-screen-chart" style="font-size:24px"></i></div>Central de<br>Projetos</div>
+    <nav class="nav-list">
+      <div class="nav-group">
+        <button class="nav-item"><i class="ph ph-house"></i>Hoje</button>
+        <button class="nav-item"><i class="ph ph-folder-open"></i>Projetos</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Trabalho</p>
+        <button class="nav-item"><i class="ph ph-table"></i>Planilha</button>
+        <button class="nav-item"><i class="ph ph-kanban"></i>Kanban</button>
+        <button class="nav-item"><i class="ph ph-map-trifold"></i>Roadmap</button>
+        <button class="nav-item"><i class="ph ph-calendar-blank"></i>Prazos</button>
+        <button class="nav-item"><i class="ph ph-flag"></i>Marcos</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Entrada</p>
+        <button class="nav-item"><i class="ph ph-tray"></i>Caixa de entrada</button>
+        <button class="nav-item active"><i class="ph ph-sparkle"></i>Revisão IA</button>
+        <button class="nav-item"><i class="ph ph-note-pencil"></i>Notas</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Sistema</p>
+        <button class="nav-item"><i class="ph ph-gear"></i>Integrações</button>
+      </div>
+    </nav>
+    <div class="recent">
+      <p>Projetos recentes</p>
+      <button class="recent-project"><i style="background:#68d7a7"></i>VistaFor<small>P0 · 34%</small></button>
+      <button class="recent-project"><i style="background:#aa8cff"></i>Intranet<small>P1 · 12%</small></button>
+      <button class="recent-project"><i style="background:#64a3ff"></i>Observa SEUMA<small>P2 · 8%</small></button>
+    </div>
+    <div class="profile"><div class="avatar">JN</div><div><strong>João</strong><small>joao.neri@…</small></div></div>
+  </aside>
+  <div class="main-content">
+    <header class="topbar">
+      <button class="search"><i class="ph ph-magnifying-glass"></i><span>Buscar tarefas, projetos...</span><kbd>⌘ K</kbd></button>
+      <div class="top-actions">
+        <button class="topbar-create"><i class="ph ph-plus" style="font-size:16px"></i>Nova tarefa</button>
+        <button aria-label="Notificações"><i class="ph ph-bell"></i><b>2</b></button>
+        <button aria-label="Configurações"><i class="ph ph-gear"></i></button>
+      </div>
+    </header>
+    <div class="content">
+      <div class="back-row"><button class="back-context"><i class="ph ph-arrow-left"></i>Voltar para fila</button></div>
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">Revisão IA</p>
+          <h1>Revisão da entrada</h1>
+          <p>Confira o conteúdo interpretado e os itens propostos. Nada é criado antes do botão final.</p>
+        </div>
+        <div class="confidence-card"><span>Confiança</span><strong>88%</strong><div><i style="width:88%"></i></div></div>
+      </div>
+
+      <ol class="steps">
+        <li class="complete"><span><i class="ph ph-check"></i></span><div><strong>Transcrição</strong><small>áudio → texto</small></div></li>
+        <li class="complete"><span><i class="ph ph-check"></i></span><div><strong>Conteúdo</strong><small>interpretado e salvo</small></div></li>
+        <li class="active"><span>3</span><div><strong>Proposta</strong><small>2 itens aguardando</small></div></li>
+        <li><span>4</span><div><strong>Execução</strong><small>após aprovação</small></div></li>
+      </ol>
+
+      <section class="panel">
+        <div class="view-panel">
+          <div class="panel-title"><i class="ph ph-file-text"></i><h2>Transcrição original</h2><button class="collapse-toggle">Recolher</button></div>
+          <p class="transcript">Reunião com a CEGEO sobre o loteamento VistaFor. Foi relatado que o raster da quadra 12 chegou com as medidas invertidas no mapa — a planta original está certa, o raster veio espelhado. O pessoal pediu para corrigir isso como prioridade alta, porque está travando a conferência das outras quadras.</p>
+          <div class="summary-row"><i class="ph ph-sparkle"></i><span>Resumo da IA: inversão de medidas no raster da quadra 12 — correção solicitada pela CEGEO como bug de prioridade alta.</span></div>
+        </div>
+      </section>
+
+      <section class="items">
+        <div class="items-head"><h2>Itens propostos</h2><span>2 aguardando sua confirmação</span><em>desmarcar remove a ação e as dependentes</em></div>
+
+        <article class="entity entity-task">
+          <div class="entity-head">
+            <label><input type="checkbox" checked> Tarefa</label>
+            <span class="entity-type task">Bug</span>
+            <span class="confidence"><b>92%</b><span class="bar"><i style="width:92%"></i></span></span>
+          </div>
+          <div class="entity-fields">
+            <label class="wide">Título da tarefa<input value="Corrigir medidas invertidas do raster na quadra 12"></label>
+            <label>Projeto<select><option>VistaFor</option></select></label>
+            <label>Módulo<input value="Loteamentos / Mapa"></label>
+            <label>Prioridade<select><option>P1</option><option>P0</option><option>P2</option></select></label>
+            <label>Complexidade<select><option>Alta</option><option>Média</option><option>Baixa</option></select></label>
+            <label>Prazo citado<input value=""></label>
+            <label class="wide">Informações úteis<textarea>O raster da quadra 12 chegou espelhado; a planta original está correta. Conferência das demais quadras está travada até a correção.</textarea></label>
+          </div>
+          <div class="entity-evidence"><small>EVIDÊNCIA</small><p>“o raster da quadra 12 chegou com as medidas invertidas no mapa” <i>— trecho da transcrição</i></p><p>“corrigir isso como prioridade alta” <i>— solicitação da CEGEO</i></p></div>
+          <div class="duplicates"><span>Corrigir exclusão de medidas (VistaFor)</span></div>
+        </article>
+
+        <article class="entity entity-context">
+          <div class="entity-head">
+            <label><input type="checkbox" checked> Contexto</label>
+            <span class="entity-type context">Decisão</span>
+            <span class="confidence"><b>84%</b><span class="bar"><i style="width:84%"></i></span></span>
+          </div>
+          <div class="entity-fields">
+            <label>Título do contexto<input value="CEGEO validou que a planta original é a fonte correta"></label>
+            <label>Tipo<select><option>Decisão</option><option>Fato</option><option>Regra</option></select></label>
+            <label class="wide">Informação para contexto<textarea>Em reunião, a CEGEO confirmou que a planta original é a referência; o raster da quadra 12 veio espelhado e deve ser corrigido no módulo de Loteamentos.</textarea></label>
+          </div>
+          <div class="entity-evidence"><small>EVIDÊNCIA</small><p>“a planta original está certa, o raster veio espelhado” <i>— trecho da transcrição</i></p></div>
+        </article>
+      </section>
+
+      <footer class="review-footer">
+        <button class="discard-button"><i class="ph ph-trash"></i>Descartar entrada</button>
+        <span>Serão criados <b>2 itens</b> · 1 card em Backlog + 1 contexto</span>
+        <button class="btn-primary"><i class="ph ph-check-circle" style="font-size:17px"></i>Aprovar plano</button>
+      </footer>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ================= VARIANTE 2 — Painel dividido ================= -->
+<div class="variant" data-variant="2" data-v-active="2">
+<div class="v2 app-shell" data-show-transcript="on" data-panel-pos="left">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark"><i class="ph-duotone ph-projector-screen-chart" style="font-size:24px"></i></div>Central de<br>Projetos</div>
+    <nav class="nav-list">
+      <div class="nav-group">
+        <button class="nav-item"><i class="ph ph-house"></i>Hoje</button>
+        <button class="nav-item"><i class="ph ph-folder-open"></i>Projetos</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Trabalho</p>
+        <button class="nav-item"><i class="ph ph-table"></i>Planilha</button>
+        <button class="nav-item"><i class="ph ph-kanban"></i>Kanban</button>
+        <button class="nav-item"><i class="ph ph-map-trifold"></i>Roadmap</button>
+        <button class="nav-item"><i class="ph ph-calendar-blank"></i>Prazos</button>
+        <button class="nav-item"><i class="ph ph-flag"></i>Marcos</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Entrada</p>
+        <button class="nav-item"><i class="ph ph-tray"></i>Caixa de entrada</button>
+        <button class="nav-item active"><i class="ph ph-sparkle"></i>Revisão IA</button>
+        <button class="nav-item"><i class="ph ph-note-pencil"></i>Notas</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Sistema</p>
+        <button class="nav-item"><i class="ph ph-gear"></i>Integrações</button>
+      </div>
+    </nav>
+    <div class="recent">
+      <p>Projetos recentes</p>
+      <button class="recent-project"><i style="background:#68d7a7"></i>VistaFor<small>P0 · 34%</small></button>
+      <button class="recent-project"><i style="background:#aa8cff"></i>Intranet<small>P1 · 12%</small></button>
+      <button class="recent-project"><i style="background:#64a3ff"></i>Observa SEUMA<small>P2 · 8%</small></button>
+    </div>
+    <div class="profile"><div class="avatar">JN</div><div><strong>João</strong><small>joao.neri@…</small></div></div>
+  </aside>
+  <div class="main-content">
+    <header class="topbar">
+      <button class="search"><i class="ph ph-magnifying-glass"></i><span>Buscar tarefas, projetos...</span><kbd>⌘ K</kbd></button>
+      <div class="top-actions">
+        <button class="topbar-create"><i class="ph ph-plus" style="font-size:16px"></i>Nova tarefa</button>
+        <button aria-label="Notificações"><i class="ph ph-bell"></i><b>2</b></button>
+        <button aria-label="Configurações"><i class="ph ph-gear"></i></button>
+      </div>
+    </header>
+    <div class="content">
+      <div class="back-row"><button class="back-context"><i class="ph ph-arrow-left"></i>Voltar para fila</button></div>
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">Revisão IA</p>
+          <h1>Revisão da entrada</h1>
+          <p>Contexto à esquerda, decisão à direita — confira o que a IA leu antes de aprovar o que ela propõe.</p>
+        </div>
+        <div class="confidence-card"><span>Confiança</span><strong>88%</strong><div><i style="width:88%"></i></div></div>
+      </div>
+
+      <div class="split">
+        <section class="context-panel">
+          <header><i class="ph-duotone ph-file-text"></i><strong>Entrada original</strong><span class="confidence"><b>88%</b></span></header>
+          <div class="cp-block"><small>Transcrição</small><p class="cp-transcript">Reunião com a CEGEO sobre o loteamento VistaFor. Foi relatado que o raster da quadra 12 chegou com as medidas invertidas no mapa — a planta original está certa, o raster veio espelhado. O pessoal pediu para corrigir isso como prioridade alta, porque está travando a conferência das outras quadras.</p></div>
+          <div class="cp-block"><small>Origem</small><span class="cp-origin"><i class="ph ph-file-audio"></i>Áudio · há 2 h</span></div>
+          <div class="cp-block"><small>Por que essa classificação?</small><div class="cp-evidence">
+            <p><i class="ph ph-check-circle"></i>“o raster da quadra 12 chegou com as medidas invertidas” — citação direta</p>
+            <p><i class="ph ph-check-circle"></i>“corrigir isso como prioridade alta” — solicitação explícita da CEGEO</p>
+            <p><i class="ph ph-check-circle"></i>Vocabulário “quadra / raster / planta” já associado ao VistaFor</p>
+          </div></div>
+          <div class="cp-block"><small>Possível duplicidade</small><div class="cp-duplicates"><span>Corrigir exclusão de medidas (VistaFor)</span></div></div>
+        </section>
+
+        <div class="main-col">
+          <section class="md-panel">
+            <header><i class="ph ph-note-pencil"></i><h2>Conteúdo interpretado</h2><span class="save-state"><i class="ph ph-check"></i>Salvo</span></header>
+            <div class="md">
+              <h2>Reunião CEGEO — VistaFor</h2>
+              <p><span class="md-tag">Decisão</span> A CEGEO confirmou que a <strong>planta original é a referência</strong> para conferência do loteamento.</p>
+              <p><span class="md-tag">Bug</span> O <strong>raster da quadra 12</strong> chegou com as medidas <strong>invertidas</strong> (espelhado) no mapa.</p>
+              <ul>
+                <li>Corrigir a inversão no módulo Loteamentos / Mapa.</li>
+                <li>Prioridade alta: a conferência das demais quadras está travada.</li>
+              </ul>
+            </div>
+          </section>
+
+          <article class="entity entity-task">
+            <div class="entity-head">
+              <label><input type="checkbox" checked> Tarefa · <span class="entity-type task">Bug</span></label>
+              <span class="confidence"><b>92%</b><span class="bar"><i style="width:92%"></i></span></span>
+            </div>
+            <div class="entity-fields">
+              <label class="wide">Título da tarefa<input value="Corrigir medidas invertidas do raster na quadra 12"></label>
+              <label>Projeto<select><option>VistaFor</option></select></label>
+              <label>Módulo<input value="Loteamentos / Mapa"></label>
+              <label>Prioridade<select><option>P1</option><option>P0</option><option>P2</option></select></label>
+              <label>Complexidade<select><option>Alta</option><option>Média</option><option>Baixa</option></select></label>
+              <label class="wide">Informações úteis<textarea>O raster da quadra 12 chegou espelhado; a planta original está correta. Conferência das demais quadras está travada até a correção.</textarea></label>
+            </div>
+            <div class="entity-evidence"><small>EVIDÊNCIA</small><p>“o raster da quadra 12 chegou com as medidas invertidas no mapa” <i>— trecho da transcrição</i></p></div>
+          </article>
+
+          <article class="entity entity-context">
+            <div class="entity-head">
+              <label><input type="checkbox" checked> Contexto · <span class="entity-type context">Decisão</span></label>
+              <span class="confidence"><b>84%</b><span class="bar"><i style="width:84%"></i></span></span>
+            </div>
+            <div class="entity-fields">
+              <label>Título do contexto<input value="CEGEO validou que a planta original é a fonte correta"></label>
+              <label>Tipo<select><option>Decisão</option><option>Fato</option><option>Regra</option></select></label>
+              <label class="wide">Informação para contexto<textarea>Em reunião, a CEGEO confirmou que a planta original é a referência; o raster da quadra 12 veio espelhado e deve ser corrigido no módulo de Loteamentos.</textarea></label>
+            </div>
+            <div class="entity-evidence"><small>EVIDÊNCIA</small><p>“a planta original está certa, o raster veio espelhado” <i>— trecho da transcrição</i></p></div>
+          </article>
+        </div>
+      </div>
+
+      <footer class="review-footer">
+        <button class="discard-button"><i class="ph ph-trash"></i>Descartar entrada</button>
+        <span>Serão criados <b>2 itens</b> · 1 card em Backlog + 1 contexto</span>
+        <button class="btn-primary"><i class="ph ph-check-circle" style="font-size:17px"></i>Aprovar plano</button>
+      </footer>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ================= VARIANTE 3 — Console de aprovação ================= -->
+<div class="variant" data-variant="3" data-v-active="3">
+<div class="v3 app-shell" data-show-confidence="on" data-dense="comfortable" data-show-evidence="on">
+  <aside class="sidebar">
+    <div class="brand"><div class="brand-mark"><i class="ph-duotone ph-projector-screen-chart" style="font-size:24px"></i></div>Central de<br>Projetos</div>
+    <nav class="nav-list">
+      <div class="nav-group">
+        <button class="nav-item"><i class="ph ph-house"></i>Hoje</button>
+        <button class="nav-item"><i class="ph ph-folder-open"></i>Projetos</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Trabalho</p>
+        <button class="nav-item"><i class="ph ph-table"></i>Planilha</button>
+        <button class="nav-item"><i class="ph ph-kanban"></i>Kanban</button>
+        <button class="nav-item"><i class="ph ph-map-trifold"></i>Roadmap</button>
+        <button class="nav-item"><i class="ph ph-calendar-blank"></i>Prazos</button>
+        <button class="nav-item"><i class="ph ph-flag"></i>Marcos</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Entrada</p>
+        <button class="nav-item"><i class="ph ph-tray"></i>Caixa de entrada</button>
+        <button class="nav-item active"><i class="ph ph-sparkle"></i>Revisão IA</button>
+        <button class="nav-item"><i class="ph ph-note-pencil"></i>Notas</button>
+      </div>
+      <div class="nav-group">
+        <p class="nav-group-label">Sistema</p>
+        <button class="nav-item"><i class="ph ph-gear"></i>Integrações</button>
+      </div>
+    </nav>
+    <div class="recent">
+      <p>Projetos recentes</p>
+      <button class="recent-project"><i style="background:#68d7a7"></i>VistaFor<small>P0 · 34%</small></button>
+      <button class="recent-project"><i style="background:#aa8cff"></i>Intranet<small>P1 · 12%</small></button>
+      <button class="recent-project"><i style="background:#64a3ff"></i>Observa SEUMA<small>P2 · 8%</small></button>
+    </div>
+    <div class="profile"><div class="avatar">JN</div><div><strong>João</strong><small>joao.neri@…</small></div></div>
+  </aside>
+  <div class="main-content">
+    <header class="topbar">
+      <button class="search"><i class="ph ph-magnifying-glass"></i><span>Buscar tarefas, projetos...</span><kbd>⌘ K</kbd></button>
+      <div class="top-actions">
+        <button class="topbar-create"><i class="ph ph-plus" style="font-size:16px"></i>Nova tarefa</button>
+        <button aria-label="Notificações"><i class="ph ph-bell"></i><b>2</b></button>
+        <button aria-label="Configurações"><i class="ph ph-gear"></i></button>
+      </div>
+    </header>
+    <div class="content">
+      <div class="back-row"><button class="back-context"><i class="ph ph-arrow-left"></i>Voltar para fila</button></div>
+      <div class="page-head">
+        <div>
+          <p class="eyebrow">Revisão IA</p>
+          <h1>Revisão da entrada</h1>
+          <p>Revisão em mesa de triagem: marque os itens, confira a evidência e aprove em um gesto.</p>
+        </div>
+        <div class="confidence-card"><span>Confiança</span><strong>88%</strong><div><i style="width:88%"></i></div></div>
+      </div>
+
+      <section class="capture-bar">
+        <i class="ph-duotone ph-file-text"></i>
+        <div class="cb-text"><strong>Raster da quadra 12 — medidas invertidas</strong><span>Reunião CEGEO: planta original correta, raster espelhado; correção como prioridade alta.</span></div>
+        <span class="cb-origin"><i class="ph ph-file-audio"></i>Áudio · há 2 h</span>
+        <span class="confidence"><b>88%</b><span class="bar"><i style="width:88%"></i></span></span>
+      </section>
+
+      <section class="md-strip">
+        <header><i class="ph ph-note-pencil"></i><h2>Conteúdo interpretado</h2><span><i class="ph ph-caret-down"></i>Ver resumo</span></header>
+        <div class="md-body md">
+          <p><span class="md-tag">Decisão</span> CEGEO confirmou que a <strong>planta original é a referência</strong>.</p>
+          <p><span class="md-tag">Bug</span> <strong>Raster da quadra 12</strong> chegou espelhado; correção no módulo Loteamentos / Mapa, prioridade alta.</p>
+        </div>
+      </section>
+
+      <section class="triage">
+        <table>
+          <thead>
+            <tr><th class="col-check"></th><th class="col-entity">Tipo</th><th class="col-title">Proposta</th><th class="col-proj">Classificação</th><th class="col-confidence">Confiança</th><th class="col-evidence">Evidência</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="col-check"><input type="checkbox" checked></td>
+              <td class="col-entity"><span class="entity-type task">Bug</span></td>
+              <td class="col-title"><p>Corrigir medidas invertidas do raster na quadra 12</p><small>tarefa · Backlog</small></td>
+              <td class="col-proj"><div class="suggestion-row"><span><b>VistaFor</b> / Loteamentos</span><span>P1</span><span>Alta</span></div></td>
+              <td class="col-confidence"><span class="confidence"><b>92%</b><span class="bar"><i style="width:92%"></i></span></span></td>
+              <td class="col-evidence"><p>“o raster da quadra 12 chegou com as medidas invertidas”</p></td>
+            </tr>
+            <tr>
+              <td class="col-check"><input type="checkbox" checked></td>
+              <td class="col-entity"><span class="entity-type context">Decisão</span></td>
+              <td class="col-title"><p>CEGEO validou que a planta original é a fonte correta</p><small>contexto · VistaFor</small></td>
+              <td class="col-proj"><div class="suggestion-row"><span><b>VistaFor</b> / Contexto</span><span>—</span></div></td>
+              <td class="col-confidence"><span class="confidence"><b>84%</b><span class="bar"><i style="width:84%"></i></span></span></td>
+              <td class="col-evidence"><p>“a planta original está certa, o raster veio espelhado”</p></td>
+            </tr>
+            <tr class="excluded">
+              <td class="col-check"><input type="checkbox"></td>
+              <td class="col-entity"><span class="entity-type task">Tarefa</span></td>
+              <td class="col-title"><p>Gerar relatório de conferência das quadras</p><small>tarefa · Backlog</small></td>
+              <td class="col-proj"><div class="suggestion-row"><span><b>VistaFor</b> / Relatórios</span><span>P3</span><span>Baixa</span></div></td>
+              <td class="col-confidence"><span class="confidence"><b>61%</b><span class="bar"><i style="width:61%"></i></span></span></td>
+              <td class="col-evidence"><p>Inferida do contexto; sem citação direta.</p></td>
+            </tr>
+          </tbody>
+        </table>
+      </section>
+
+      <footer class="review-footer">
+        <button class="discard-button"><i class="ph ph-trash"></i>Descartar entrada</button>
+        <span class="sel-summary"><b>2</b> de 3 itens selecionados</span>
+        <button class="btn-primary"><i class="ph ph-check-circle" style="font-size:17px"></i>Aprovar seleção</button>
+      </footer>
+    </div>
+  </div>
+</div>
+</div>
+
+</div><!-- /stage -->
+
+<script>
+// Alternância de variante + knobs de parâmetro + modo comparar.
+const PARAMS = {
+  1: { dense: { label: 'Densidade', options: [['comfortable', 'Confortável'], ['compact', 'Compacta']] }, 'show-evidence': { label: 'Evidências', options: [['on', 'Visíveis'], ['off', 'Ocultas']] } },
+  2: { 'panel-pos': { label: 'Painel de contexto', options: [['left', 'À esquerda'], ['right', 'À direita']] }, 'show-transcript': { label: 'Transcrição', options: [['on', 'Visível'], ['off', 'Oculta']] } },
+  3: { dense: { label: 'Densidade', options: [['comfortable', 'Confortável'], ['dense', 'Densa']] }, 'show-confidence': { label: 'Confiança', options: [['on', 'Visível'], ['off', 'Oculta']] }, 'show-evidence': { label: 'Evidência', options: [['on', 'Visível'], ['off', 'Oculta']] } },
+};
+const tabs = document.querySelectorAll('.db-tab[data-target]');
+const paramsBox = document.querySelector('.db-params');
+let active = 1;
+
+function renderParams(v) {
+  paramsBox.innerHTML = '';
+  const defs = PARAMS[v];
+  if (!defs) { paramsBox.innerHTML = '<span class="db-note">sem parâmetros</span>'; return; }
+  const shell = document.querySelector(`.v${v}`);
+  for (const [key, def] of Object.entries(defs)) {
+    const dataKey = key.replace(/-([a-z])/g, (_, c) => c.toUpperCase());
+    const label = document.createElement('label');
+    label.textContent = def.label;
+    const select = document.createElement('select');
+    for (const [value, text] of def.options) {
+      const opt = document.createElement('option');
+      opt.value = value; opt.textContent = text;
+      if (shell.dataset[dataKey] === value) opt.selected = true;
+      select.appendChild(opt);
+    }
+    select.addEventListener('change', () => { shell.dataset[dataKey] = select.value; });
+    label.appendChild(select);
+    paramsBox.appendChild(label);
+  }
+}
+
+function activate(v) {
+  active = v;
+  for (const t of tabs) t.setAttribute('aria-pressed', String(Number(t.dataset.target) === v));
+  document.body.dataset.mode = 'single';
+  document.querySelectorAll('.variant').forEach((el) => { el.dataset.vActive = Number(el.dataset.variant) === v ? String(v) : '0'; });
+  renderParams(v);
+}
+
+tabs.forEach((t) => t.addEventListener('click', () => activate(Number(t.dataset.target))));
+document.querySelector('.db-compare').addEventListener('click', () => {
+  const next = document.body.dataset.mode === 'compare' ? 'single' : 'compare';
+  document.body.dataset.mode = next;
+  if (next === 'compare') { tabs.forEach((el) => el.setAttribute('aria-pressed', 'false')); }
+  else activate(active);
+});
+activate(1);
+</script>
+</body>
+</html>
