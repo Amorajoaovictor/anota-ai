@@ -202,7 +202,7 @@ describe('front do harness supervisionado', () => {
 
     const title = await screen.findByLabelText('Título de Preparar relatório')
     fireEvent.change(title, { target: { value: 'Preparar relatório final' } })
-    expect(screen.getByRole('button', { name: 'Criar 2 itens' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Criar 2 itens' })).toBeEnabled()
 
     await waitFor(() => expect(api.saveProposal).toHaveBeenCalledWith('inbox-1', expect.objectContaining({
       expectedVersion: 8,
@@ -476,7 +476,7 @@ describe('front do harness supervisionado', () => {
     expect(api.execute).not.toHaveBeenCalled()
 
     fireEvent.change(title, { target: { value: 'Preparar relatório final' } })
-    expect(screen.getByRole('button', { name: 'Criar 2 itens' })).toBeDisabled()
+    expect(screen.getByRole('button', { name: 'Criar 2 itens' })).toBeEnabled()
     await waitFor(() => expect(screen.getByText('Salvo')).toBeInTheDocument())
 
     await userEvent.click(screen.getByRole('button', { name: 'Criar 2 itens' }))
@@ -561,5 +561,68 @@ describe('front do harness supervisionado', () => {
     await userEvent.click(toggle)
     expect(screen.getByText('Fica de fora')).toBeInTheDocument()
     await waitFor(() => expect(screen.getByRole('button', { name: 'Criar 1 item' })).toBeEnabled())
+  })
+
+  /**
+   * Protege: proposta pode ser rejeitada na própria etapa final, sem executar entidades.
+   * Regressão real: redesign remove a ação de descarte depois que os cards aparecem.
+   * Impacto: usuário fica preso numa proposta que decidiu não aprovar.
+   */
+  it('descarta a proposta na etapa final sem executar cards', async () => {
+    const api = client(proposalView)
+    render(<HarnessReviewPanel inboxItem={inbox} client={api} notify={vi.fn()} onBack={vi.fn()} autosaveDelayMs={25} />)
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Descartar entrada' }))
+
+    expect(api.discard).toHaveBeenCalledWith('inbox-1')
+    expect(api.execute).not.toHaveBeenCalled()
+    expect(await screen.findByRole('heading', { name: 'Entrada descartada' })).toBeInTheDocument()
+  })
+
+  /**
+   * Protege: PUT já confirmado não bloqueia aprovação quando o GET de reconciliação falha.
+   * Regressão real: front marca autosave como erro, mantém versão antiga e desabilita CTA para sempre.
+   * Impacto: cards válidos e persistidos nunca chegam à execução final.
+   */
+  it('recarrega revisão persistida e aprova depois de falha na reconciliação do autosave', async () => {
+    const correctedProposal: HarnessProposalV1 = {
+      ...proposalView.proposalRevision!.proposal,
+      items: proposalView.proposalRevision!.proposal.items.map((item) => item.id === 'task-base' && item.entity === 'TASK'
+        ? { ...item, data: { ...item.data, title: 'Preparar relatório final' } }
+        : item),
+    }
+    const recoveredView: HarnessView = {
+      ...proposalView,
+      run: { ...proposalView.run, version: 9 },
+      proposalRevision: {
+        ...proposalView.proposalRevision!,
+        id: 'proposal-user-2',
+        version: 2,
+        contentHash: 'proposal-user-hash',
+        proposal: correctedProposal,
+      },
+    }
+    const api = client(proposalView)
+    vi.mocked(api.load)
+      .mockResolvedValueOnce(proposalView)
+      .mockResolvedValueOnce(recoveredView)
+    vi.mocked(api.saveProposal).mockRejectedValueOnce(new Error('Resposta perdida depois do PUT'))
+    render(<HarnessReviewPanel inboxItem={inbox} client={api} notify={vi.fn()} onBack={vi.fn()} autosaveDelayMs={25} />)
+
+    fireEvent.change(await screen.findByLabelText('Título de Preparar relatório'), { target: { value: 'Preparar relatório final' } })
+    await screen.findByText('Autosave incompleto. Criar itens tenta recuperar a revisão; descarte continua disponível.')
+
+    const approve = screen.getByRole('button', { name: 'Criar 2 itens' })
+    expect(approve).toBeEnabled()
+    await userEvent.click(approve)
+
+    await waitFor(() => expect(api.load).toHaveBeenCalledTimes(2))
+    expect(api.saveProposal).toHaveBeenCalledTimes(1)
+    expect(api.execute).toHaveBeenCalledWith('inbox-1', {
+      expectedVersion: 9,
+      proposalRevisionId: 'proposal-user-2',
+      targetHash: 'proposal-user-hash',
+      selectedItemIds: ['task-base', 'task-dependent'],
+    })
   })
 })

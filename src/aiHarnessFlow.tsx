@@ -585,8 +585,11 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
   const [savedSignature, setSavedSignature] = useState(() => proposalSignature(view.proposalRevision!.proposal, view.selectedItemIds))
   const [saveState, setSaveState] = useState<EditorState>('saved')
   const [executing, setExecuting] = useState(false)
+  const [discarding, setDiscarding] = useState(false)
   const [saveSequence, setSaveSequence] = useState(0)
   const saveInFlightRef = useRef(false)
+  const savePromiseRef = useRef<Promise<HarnessView> | null>(null)
+  const autosaveTimerRef = useRef<number | null>(null)
   const proposalProjects = useMemo(() => getProposalProjectOptions(projects, draft), [draft, projects])
   const dependencyTitlesById = useMemo(() => {
     const titles = new Map<string, string>()
@@ -616,21 +619,24 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
   }, [dirty, onDirtyChange, saveState])
 
   useEffect(() => {
-    if (!dirty || saveInFlightRef.current) return
+    if (!dirty || saveInFlightRef.current || executing || discarding) return
     setSaveState('saving')
     const timer = window.setTimeout(() => {
+      autosaveTimerRef.current = null
       const proposal = draft
       const ids = proposal.items.filter((item) => selected.has(item.id)).map((item) => item.id)
       const savingSignature = proposalSignature(proposal, ids)
       let saved = false
       let hasNewerProposal = false
       saveInFlightRef.current = true
-      client.saveProposal(inboxItem.id, {
+      const savePromise = client.saveProposal(inboxItem.id, {
         expectedVersion: view.run.version,
         parentRevisionId: view.proposalRevision!.id,
         proposal,
         selectedItemIds: ids,
-      }).then((next) => {
+      })
+      savePromiseRef.current = savePromise
+      savePromise.then((next) => {
         saved = true
         hasNewerProposal = latestProposalRef.current.signature !== savingSignature
         onViewChange(next)
@@ -639,11 +645,16 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
       }).catch((error) => setSaveState(error instanceof ApiError && error.status === 409 ? 'conflict' : 'error'))
         .finally(() => {
           saveInFlightRef.current = false
+          if (savePromiseRef.current === savePromise) savePromiseRef.current = null
           if (saved && hasNewerProposal) setSaveSequence((current) => current + 1)
         })
     }, autosaveDelayMs)
-    return () => window.clearTimeout(timer)
-  }, [autosaveDelayMs, client, dirty, draft, inboxItem.id, onViewChange, saveSequence, selected, view.proposalRevision, view.run.version])
+    autosaveTimerRef.current = timer
+    return () => {
+      window.clearTimeout(timer)
+      if (autosaveTimerRef.current === timer) autosaveTimerRef.current = null
+    }
+  }, [autosaveDelayMs, client, dirty, discarding, draft, executing, inboxItem.id, onViewChange, saveSequence, selected, view.proposalRevision, view.run.version])
 
   function patchItem(itemId: string, nextItem: HarnessProposalV1['items'][number]) {
     setDraft((current) => ({ ...current, items: current.items.map((item) => item.id === itemId ? nextItem : item) }))
@@ -679,24 +690,83 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
   const canAddItem = Boolean(proposalProjects[0]?.reference ?? draft.items.map(proposalProjectRef).find(Boolean))
 
   async function execute() {
-    const revision = view.proposalRevision
-    if (!revision || dirty || saveState !== 'saved') return
+    const approvalSnapshot = latestProposalRef.current
+    if (autosaveTimerRef.current !== null) {
+      window.clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = null
+    }
     setExecuting(true)
     try {
+      let currentView = view
+      const inFlight = savePromiseRef.current
+      if (inFlight) {
+        try {
+          currentView = await inFlight
+        } catch {
+          currentView = await client.load(inboxItem.id)
+          onViewChange(currentView)
+        }
+      } else if (saveState === 'error' || saveState === 'conflict') {
+        currentView = await client.load(inboxItem.id)
+        onViewChange(currentView)
+      }
+
+      let revision = currentView.proposalRevision
+      if (!revision) throw new Error('Revisão da proposta indisponível.')
+      const persistedSignature = proposalSignature(revision.proposal, currentView.selectedItemIds)
+      if (persistedSignature !== approvalSnapshot.signature) {
+        setSaveState('saving')
+        try {
+          currentView = await client.saveProposal(inboxItem.id, {
+            expectedVersion: currentView.run.version,
+            parentRevisionId: revision.id,
+            proposal: approvalSnapshot.draft,
+            selectedItemIds: approvalSnapshot.selectedIds,
+          })
+        } catch (error) {
+          setSaveState(error instanceof ApiError && error.status === 409 ? 'conflict' : 'error')
+          throw error
+        }
+        onViewChange(currentView)
+        revision = currentView.proposalRevision
+        if (!revision) throw new Error('Revisão salva não foi devolvida pelo servidor.')
+      }
+      setSavedSignature(approvalSnapshot.signature)
+      setSaveState('saved')
+
       const next = await client.execute(inboxItem.id, {
-        expectedVersion: view.run.version,
+        expectedVersion: currentView.run.version,
         proposalRevisionId: revision.id,
         targetHash: revision.contentHash,
-        selectedItemIds: selectedIds,
+        selectedItemIds: approvalSnapshot.selectedIds,
       })
       onViewChange(next)
-      notify(selectedIds.length
-        ? `${selectedIds.length} itens enviados para criação.`
+      notify(approvalSnapshot.selectedIds.length
+        ? `${approvalSnapshot.selectedIds.length} itens enviados para criação.`
         : 'Revisão concluída sem criar entidades.')
     } catch (error) {
+      if (error instanceof ApiError && error.status === 409) setSaveState('conflict')
       notify(errorMessage(error, 'Não foi possível criar os itens.'), 'error')
     } finally {
       setExecuting(false)
+    }
+  }
+
+  async function discard() {
+    if (autosaveTimerRef.current !== null) {
+      window.clearTimeout(autosaveTimerRef.current)
+      autosaveTimerRef.current = null
+    }
+    setDiscarding(true)
+    try {
+      await savePromiseRef.current?.catch(() => undefined)
+      const next = await client.discard(inboxItem.id)
+      onViewChange(next)
+      notify('Entrada descartada.', 'info')
+    } catch (error) {
+      notify(errorMessage(error, 'Não foi possível descartar.'), 'error')
+    } finally {
+      setDiscarding(false)
     }
   }
 
@@ -727,13 +797,16 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
         {group.topicIds.length > 1 && <small>{group.topicIds.length} tópicos agrupados</small>}
       </article>)}
     </section>}
-    {saveState === 'conflict' && <InlineError>Proposta ficou desatualizada. Reabra a entrada antes de criar.</InlineError>}
-    {saveState === 'error' && <InlineError>Não foi possível salvar alterações dos itens propostos.</InlineError>}
+    {saveState === 'conflict' && <InlineError>Proposta desatualizada. Criar itens recarrega a revisão antes de concluir.</InlineError>}
+    {saveState === 'error' && <InlineError>Autosave incompleto. Criar itens tenta recuperar a revisão; descarte continua disponível.</InlineError>}
     <footer className="review-footer">
+      <Button variant="danger" icon={<Trash size={17} />} disabled={executing || discarding} onClick={discard}>
+        {discarding ? 'Descartando…' : 'Descartar entrada'}
+      </Button>
       <span>{selectedIds.length
         ? `${selectedIds.length} ${selectedIds.length === 1 ? 'item será' : 'itens serão'} criados; não selecionados ficam fora da execução.`
         : 'Nenhuma entidade será criada; o conteúdo permanece não resolvido.'}</span>
-      <Button variant="primary" icon={<CheckCircle size={18} weight="fill" />} disabled={dirty || saveState !== 'saved' || executing} onClick={execute}>
+      <Button variant="primary" icon={<CheckCircle size={18} weight="fill" />} disabled={executing || discarding} onClick={execute}>
         {executing ? (selectedIds.length ? 'Criando…' : 'Concluindo…') : (selectedIds.length ? `Criar ${selectedIds.length} ${selectedIds.length === 1 ? 'item' : 'itens'}` : 'Concluir sem criar itens')}
       </Button>
     </footer>

@@ -33,7 +33,8 @@ Aplicativo de organização para programadores que reúne anotações rápidas, 
 - Resumir notas.
 - Sugerir próximos passos.
 - Atualizar Kanban ou roadmap somente após confirmação do usuário.
-
+- mcp
+- interação com obsidian
 ## Fluxo principal proposto
 
 O usuário escreve uma ideia em linguagem natural. A inteligência artificial interpreta o conteúdo, sugere tarefas e objetivo relacionado. O usuário revisa e confirma. O sistema registra a nota, cria tarefas no Kanban e atualiza o roadmap.

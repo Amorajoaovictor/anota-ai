@@ -1,0 +1,3 @@
+Behavior protected: the classroom defense must cover the documented problem, user, solution, safety, requirements, validation, and next step.
+Regression detected: a slide omits a source document or presents an unvalidated hypothesis as fact.
+User/business impact: the defense becomes incomplete or overclaims evidence.
