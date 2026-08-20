@@ -1,6 +1,8 @@
 # Projeto: Organizador para Programadores
 
-Documentação inicial do aplicativo criado para centralizar ideias, tarefas e planejamento de projetos de programação.
+Documentação do **Central de Projetos**, organizador pessoal inteligente para centralizar projetos, demandas e planejamento com contexto, revisão humana e integração controlada.
+
+O conjunto foi enriquecido com base no [PRD v2.0](../prd.md). Cada documento cobre uma etapa do raciocínio de produto: problema, pesquisa, usuário, solução, cenários, jornada, modelo de negócio, requisitos e protótipo.
 
 ## Documentos
 
@@ -17,11 +19,21 @@ Documentação inicial do aplicativo criado para centralizar ideias, tarefas e p
 
 ## Visão resumida
 
-O aplicativo combina anotações rápidas, quadro Kanban, roadmap e inteligência artificial para ajudar programadores a organizar projetos em um único ambiente.
+O produto transforma informações desestruturadas — texto, áudio, reuniões, mensagens, planilha e Trello — em demandas organizadas no projeto correto. O agente contextual propõe classificações e ações com confiança e evidências; o usuário revisa e aprova; o backend executa e mantém o histórico. Planilha, Kanban, roadmap e central de prazos usam os mesmos dados.
 
-## Status
+## Estado da documentação
 
-- Problema e solução: definidos inicialmente.
-- Persona: hipótese baseada no usuário principal do projeto.
-- Coleta com outros usuários: pendente.
-- Protótipo de alta fidelidade: pendente de definição do fluxo principal.
+- Problema e espaço do problema: enriquecidos com contexto, causas, impactos e limites do MVP.
+- Pesquisa: plano acionável; entrevistas e testes com terceiros ainda pendentes.
+- Persona: hipótese de design baseada no usuário inicial, ainda não validada com público externo.
+- Ideação, cenários, jornada e Canvas: alinhados ao PRD v2.0, com confiança, evidências, fallback manual e controle humano.
+- Requisitos: especificação normativa existente em `09-documento-de-requisitos.md`.
+- Protótipo: fluxo inicial documentado em `10-prototipo-alta-fidelidade.md`; desenho em ferramenta de prototipação ainda pendente.
+
+## Princípios transversais
+
+- O usuário informa o que aconteceu; o sistema entende onde aquilo pertence.
+- IA propõe; usuário confirma; backend executa.
+- Falhas de IA, transcrição ou Trello não bloqueiam o uso manual.
+- Notas são privadas por padrão; contexto aprendido é editável.
+- Ações sensíveis exigem confirmação e auditoria.
