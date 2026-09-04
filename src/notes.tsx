@@ -150,17 +150,18 @@ function NotesSection({ title, pinned, notes, projectNameOf, taskOf, onDrop, onE
   return <section className={`keep-section ${zone.active ? 'drop-active' : ''} ${zone.over ? 'drop-over' : ''}`} {...zone.dropProps}>
     <h2>{title}{pinned && <PushPin size={11} weight="fill" />}</h2>
     <div className="keep-grid">
-      {notes.map((note) => <NoteCard key={note.id} note={note} projectName={projectNameOf(note)} task={taskOf(note)} onDrop={onDrop} onMove={(direction) => moveByKeyboard(note.id, direction)} onEdit={onEdit} onPin={onPin} onConvert={onConvert} />)}
+      {notes.map((note, index) => <NoteCard key={note.id} index={index} note={note} projectName={projectNameOf(note)} task={taskOf(note)} onDrop={onDrop} onMove={(direction) => moveByKeyboard(note.id, direction)} onEdit={onEdit} onPin={onPin} onConvert={onConvert} />)}
     </div>
     {!notes.length && <p className="keep-section-hint">Soltar aqui para {pinned ? 'fixar' : 'desafixar'}</p>}
   </section>
 }
 
-function NoteCard({ note, projectName, task, onDrop, onMove, onEdit, onPin, onConvert }: { note: Note; projectName?: string; task?: Task; onMove: (direction: -1 | 1) => void } & Pick<SectionProps, 'onDrop' | 'onEdit' | 'onPin' | 'onConvert'>) {
+function NoteCard({ note, index, projectName, task, onDrop, onMove, onEdit, onPin, onConvert }: { note: Note; index: number; projectName?: string; task?: Task; onMove: (direction: -1 | 1) => void } & Pick<SectionProps, 'onDrop' | 'onEdit' | 'onPin' | 'onConvert'>) {
   const zone = useDropZone((item) => item.type === 'note' && item.id !== note.id, (item) => onDrop(item, note.pinned, note.id))
 
   return <article
     className={`keep-card ${zone.over ? 'drop-before' : ''}`}
+    style={{ '--i': index } as React.CSSProperties}
     onClick={(event) => { if (!(event.target as HTMLElement).closest('button')) onEdit(note) }}
     {...dragHandleProps({ type: 'note', id: note.id, from: note.pinned ? 'pinned' : 'others' })}
     {...reorderKeyProps(onMove)}

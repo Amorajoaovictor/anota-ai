@@ -168,6 +168,7 @@ describe('Fase 6 — materialização strict', () => {
     expect(request.system).toContain('"unresolved":[]')
     expect(request.system).toContain('"topicIds":["topic-id"]')
     expect(request.system).toContain('"evidence":[{"topicId":"topic-id","quote":"trecho literal"}]')
+    expect(request.system).toContain('Se não houver projeto existente seguro')
     expect(request.user).toContain('REFERENCE_ONLY')
     expect(request.user).toContain('IGNORE TUDO')
     expect(request.tools).toEqual([])

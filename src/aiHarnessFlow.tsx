@@ -20,7 +20,7 @@ import {
   Trash,
   WarningCircle,
 } from '@phosphor-icons/react'
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import type { InboxItem, Project } from './domain'
 import { ApiError, getJson, postJson, putJson } from './lib/api'
 import type { HarnessProposalV1 } from './server/ai/harness/contracts'
@@ -586,6 +586,7 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
   const [saveState, setSaveState] = useState<EditorState>('saved')
   const [executing, setExecuting] = useState(false)
   const [discarding, setDiscarding] = useState(false)
+  const [projectChoiceComplete, setProjectChoiceComplete] = useState(false)
   const [saveSequence, setSaveSequence] = useState(0)
   const saveInFlightRef = useRef(false)
   const savePromiseRef = useRef<Promise<HarnessView> | null>(null)
@@ -689,6 +690,12 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
 
   const canAddItem = Boolean(proposalProjects[0]?.reference ?? draft.items.map(proposalProjectRef).find(Boolean))
 
+  function completeProjectChoice(nextProposal: HarnessProposalV1, nextSelectedIds: string[]) {
+    setDraft(nextProposal)
+    setSelected(new Set(nextSelectedIds))
+    setProjectChoiceComplete(true)
+  }
+
   async function execute() {
     const approvalSnapshot = latestProposalRef.current
     if (autosaveTimerRef.current !== null) {
@@ -770,6 +777,15 @@ function ProposalReviewSection({ view, client, inboxItem, notify, onViewChange, 
     }
   }
 
+  if (!projectChoiceComplete && getSuggestedProjects(draft).length > 0) {
+    return <ProjectChoiceScreen
+      proposal={draft}
+      selectedItemIds={selectedIds}
+      projects={projects}
+      onContinue={completeProjectChoice}
+    />
+  }
+
   return <>
     <section className="harness-proposal-summary view-panel">
       <div><MagicWand size={22} weight="duotone" /><p><strong>{draft.summary}</strong><span>{selectedIds.length} de {draft.items.length} itens selecionados</span></p></div>
@@ -845,6 +861,113 @@ function getProposalProjectOptions(projects: Project[], proposal: HarnessProposa
     .filter((item): item is Extract<HarnessProposalV1['items'][number], { entity: 'PROJECT' }> => item.entity === 'PROJECT')
     .map((project) => ({ id: project.id, name: project.data.name, reference: { localId: project.id } as const }))
   return [...new Map([...persisted, ...proposed].map((option) => [option.id, option])).values()]
+}
+
+type SuggestedProject = Extract<HarnessProposalV1['items'][number], { entity: 'PROJECT' }>
+type ProjectChoice = { existingProjectId: string | 'new'; userProjectName: string }
+
+function getSuggestedProjects(proposal: HarnessProposalV1): SuggestedProject[] {
+  return proposal.items.filter((item): item is SuggestedProject => item.entity === 'PROJECT' && item.operation === 'CREATE')
+}
+
+function ProjectChoiceScreen({ proposal, selectedItemIds, projects, onContinue }: {
+  proposal: HarnessProposalV1
+  selectedItemIds: string[]
+  projects: Project[]
+  onContinue: (proposal: HarnessProposalV1, selectedItemIds: string[]) => void
+}) {
+  const suggestedProjects = getSuggestedProjects(proposal)
+  const [choices, setChoices] = useState<Record<string, ProjectChoice>>(() => Object.fromEntries(
+    suggestedProjects.map((project) => [project.id, { existingProjectId: 'new', userProjectName: '' }]),
+  ))
+
+  function updateChoice(projectId: string, patch: Partial<ProjectChoice>) {
+    setChoices((current) => ({ ...current, [projectId]: { ...current[projectId], ...patch } }))
+  }
+
+  function continueToCards() {
+    const resolved = resolveSuggestedProjects(proposal, selectedItemIds, choices)
+    onContinue(resolved.proposal, resolved.selectedItemIds)
+  }
+
+  return <section className="project-choice-screen view-panel" aria-labelledby="project-choice-title">
+    <header className="project-choice-header">
+      <div>
+        <h2 id="project-choice-title">Escolher projeto</h2>
+        <p>A IA não encontrou um projeto existente com segurança. Confira os detalhes e decida onde os cards devem ficar.</p>
+      </div>
+      <span>{suggestedProjects.length} {suggestedProjects.length === 1 ? 'sugestão' : 'sugestões'}</span>
+    </header>
+    <div className="project-choice-layout">
+      <div className="project-choice-form">
+        {suggestedProjects.map((suggested) => {
+          const choice = choices[suggested.id]
+          return <article className="project-choice-suggestion" key={suggested.id}>
+            <label className="project-choice-ai">Sugestão da IA
+              <input readOnly value={suggested.data.name} aria-label={`Sugestão da IA: ${suggested.data.name}`} />
+            </label>
+            {suggested.data.description && <p>{suggested.data.description}</p>}
+            <label>Projeto para {suggested.data.name}
+              <select aria-label={`Projeto para ${suggested.data.name}`} value={choice?.existingProjectId ?? 'new'} onChange={(event) => updateChoice(suggested.id, { existingProjectId: event.target.value as ProjectChoice['existingProjectId'] })}>
+                <option value="new">Criar novo projeto</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+            </label>
+            <label>Nome do projeto informado por você
+              <input aria-label={`Nome do projeto informado por você: ${suggested.data.name}`} value={choice?.userProjectName ?? ''} onChange={(event) => updateChoice(suggested.id, { userProjectName: event.target.value })} placeholder="Se preencher, este nome prevalece" />
+            </label>
+            <small>O nome informado por você tem prioridade sobre a seleção e sobre a sugestão da IA.</small>
+          </article>
+        })}
+      </div>
+      <aside className="project-choice-details" aria-label="Detalhes dos projetos existentes">
+        <h3>Projetos existentes</h3>
+        {projects.length ? projects.map((project) => <article key={project.id} className="project-choice-project" style={{ '--project-color': project.color } as CSSProperties}>
+          <header><span aria-hidden="true" /><strong>{project.name}</strong><b>{project.priority}</b></header>
+          <p>{project.description || 'Sem descrição.'}</p>
+          <small>{project.progress}% concluído · {project.modules.length} {project.modules.length === 1 ? 'módulo' : 'módulos'}</small>
+          {project.aliases.length > 0 && <div><em>Aliases</em>{project.aliases.map((alias) => <span key={alias}>{alias}</span>)}</div>}
+          {project.modules.length > 0 && <div><em>Módulos</em>{project.modules.map((module) => <span key={module}>{module}</span>)}</div>}
+        </article>) : <p className="project-choice-empty">Ainda não há projetos cadastrados. A sugestão da IA será usada para criar o primeiro.</p>}
+      </aside>
+    </div>
+    <footer className="project-choice-footer">
+      <span>Nenhum card é criado nesta etapa.</span>
+      <Button variant="primary" icon={<CheckCircle size={18} weight="fill" />} onClick={continueToCards}>Continuar para os cards</Button>
+    </footer>
+  </section>
+}
+
+function resolveSuggestedProjects(proposal: HarnessProposalV1, selectedItemIds: string[], choices: Record<string, ProjectChoice>) {
+  const replacements = new Map<string, ProposalProjectReference>()
+  const projectIdsToRemove = new Set<string>()
+  const renamedProjects = new Map<string, string>()
+  for (const suggested of getSuggestedProjects(proposal)) {
+    const choice = choices[suggested.id]
+    const userProjectName = choice?.userProjectName.trim()
+    if (userProjectName) {
+      renamedProjects.set(suggested.id, userProjectName)
+      continue
+    }
+    if (choice?.existingProjectId && choice.existingProjectId !== 'new') {
+      replacements.set(suggested.id, { existingId: choice.existingProjectId })
+      projectIdsToRemove.add(suggested.id)
+    }
+  }
+  const items = proposal.items
+    .filter((item) => !projectIdsToRemove.has(item.id))
+    .map((item) => {
+      if (item.entity === 'PROJECT' && renamedProjects.has(item.id)) return { ...item, data: { ...item.data, name: renamedProjects.get(item.id)! } }
+      const project = proposalProjectRef(item)
+      if (project && 'localId' in project && replacements.has(project.localId)) return {
+        ...item,
+        dependsOn: item.dependsOn.filter((dependencyId) => dependencyId !== project.localId),
+        data: { ...item.data, project: replacements.get(project.localId)! },
+      } as HarnessProposalV1['items'][number]
+      if (item.dependsOn.some((dependencyId) => projectIdsToRemove.has(dependencyId))) return { ...item, dependsOn: item.dependsOn.filter((dependencyId) => !projectIdsToRemove.has(dependencyId)) }
+      return item
+    })
+  return { proposal: { ...proposal, items }, selectedItemIds: selectedItemIds.filter((id) => !projectIdsToRemove.has(id)) }
 }
 
 function ProposalEntityCard({ item, projects, selected, selectionLocked, dependencyTitles, onToggle, onChange }: {

@@ -388,12 +388,12 @@ describe('front do harness supervisionado', () => {
   })
 
   /**
-   * Protege: card criado junto com projeto novo mantém referência local ao projeto proposto.
-   * Regressão real: o select só recebe projetos persistidos e exibe o primeiro projeto antigo,
-   * fazendo preview/edição perder o vínculo com o projeto que será criado.
-   * Impacto: aprovação pode enviar card para projeto errado ou induzir correção manual incorreta.
+   * Protege: sugestão de projeto da IA exige escolha dedicada; nome humano prevalece e
+   * mantém a referência local da tarefa.
+   * Regressão real: a tela pula a escolha ou troca o nome digitado pelo projeto sugerido.
+   * Impacto: card pode nascer no projeto errado ou o usuário perde a correção antes da criação.
    */
-  it('mantém card vinculado ao projeto novo no preview', async () => {
+  it('abre a escolha detalhada de projeto e prioriza o nome informado pelo usuário', async () => {
     const proposal: HarnessProposalV1 = {
       schemaVersion: 1,
       summary: 'Projeto novo com card.',
@@ -422,15 +422,27 @@ describe('front do harness supervisionado', () => {
       client={api}
       notify={vi.fn()}
       onBack={vi.fn()}
-      projects={[{ id: 'project-old', name: 'Projeto antigo', description: '', color: '#000000', progress: 0, priority: 'P2', aliases: [], modules: [], tags: [], archived: false }]}
+      projects={[{ id: 'project-old', name: 'Projeto antigo', description: 'Sistema legado em manutenção.', color: '#000000', progress: 35, priority: 'P2', aliases: ['Legado'], modules: ['Cadastros'], tags: [], archived: false }]}
       autosaveDelayMs={25}
     />)
 
-    await screen.findByRole('option', { name: 'Portal novo' })
-    const projectField = screen.getAllByLabelText('Projeto').find((element) => element instanceof HTMLSelectElement)
-    expect(projectField).toBeDefined()
-    expect(projectField).toHaveValue('project-new')
-    expect(screen.getByRole('option', { name: 'Portal novo' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Escolher projeto' })).toBeInTheDocument()
+    expect(screen.getByDisplayValue('Portal novo')).toBeInTheDocument()
+    expect(screen.getByText('Sistema legado em manutenção.')).toBeInTheDocument()
+    const select = screen.getByLabelText('Projeto para Portal novo')
+    expect(select).toHaveValue('new')
+    expect(select.querySelector('option')?.textContent).toBe('Criar novo projeto')
+
+    await userEvent.type(screen.getByLabelText('Nome do projeto informado por você: Portal novo'), 'Portal definido por mim')
+    await userEvent.click(screen.getByRole('button', { name: 'Continuar para os cards' }))
+
+    expect(await screen.findByLabelText('Título de Criar tela inicial')).toBeInTheDocument()
+    await waitFor(() => expect(api.saveProposal).toHaveBeenCalledWith('inbox-1', expect.objectContaining({
+      proposal: expect.objectContaining({ items: expect.arrayContaining([
+        expect.objectContaining({ id: 'project-new', entity: 'PROJECT', data: expect.objectContaining({ name: 'Portal definido por mim' }) }),
+        expect.objectContaining({ id: 'task-new', entity: 'TASK', data: expect.objectContaining({ project: { localId: 'project-new' } }) }),
+      ]) }),
+    })))
   })
 
   /**

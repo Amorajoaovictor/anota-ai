@@ -9,7 +9,7 @@ import { useProjectData, type ProjectActions } from './lib/store'
 import { Phase1View, projectSections, type Phase1Section, type ProjectSection } from './phase1'
 import { TaskCreateDialog, type TaskCreateDefaults, type TaskCreateInput } from './taskCreate'
 import { SignOutButton } from './app/SignOutButton'
-import { Button, CommandPalette, Toast, useToast, type CommandAction, type Notify, type PaletteResult } from './ui'
+import { Button, CommandPalette, EmptyState, Toast, useToast, type CommandAction, type Notify, type PaletteResult } from './ui'
 
 type Section = 'Hoje' | Phase1Section
 
@@ -286,6 +286,7 @@ function PlanTimeline({ tasks, onReorder, onFinish, onAdd }: { tasks: Task[]; on
   }
 
   return <div className={`timeline ${zone.active ? 'drop-active' : ''}`} {...zone.dropProps}>
+    {tasks.length === 0 && <EmptyState size="inline" icon={<ListChecks size={24} />} title="Plano vazio" description="Nenhuma tarefa em aberto. Adicione a próxima ação ao plano de ação." />}
     {tasks.map((task, index) => <TaskRow key={task.id} task={task} first={index === 0} onReorder={onReorder} onMove={(direction) => moveByKeyboard(task.id, direction)} onFinish={() => onFinish(task)} />)}
     <button className="add-plan" onClick={onAdd}><Plus size={20} />Adicionar tarefa ao plano</button>
   </div>
@@ -301,13 +302,18 @@ function TaskRow({ task, first, onReorder, onMove, onFinish }: { task: Task; fir
     aria-label={`${task.title}. Alt seta para cima ou para baixo reordena.`}
     {...zone.dropProps}
   >
-    <div className="task-time"><span>{task.due ?? 'Sem prazo'}</span><small>{task.complexity ? `Complexidade ${task.complexity.toLocaleLowerCase()}` : 'A estimar'}</small></div>
+    <div className="task-time"><span>{task.due ?? 'Sem prazo'}</span></div>
     <div className="task-node" style={{ '--task-color': task.color } as React.CSSProperties} />
     <div className="task-card">
       <div>
         <small className="project-name" style={{ color: task.color }}>{task.project}</small>
         <h3>{task.title}</h3>
-        <div className="task-meta"><span>{task.priority}</span>{Boolean(task.dependsOnIds?.length) && <><span className="dot">•</span><span>{task.dependsOnIds!.length} dependência{task.dependsOnIds!.length > 1 ? 's' : ''}</span></>}</div>
+        <div className="task-meta">
+          <span>{task.priority}</span>
+          <span className="dot">•</span>
+          <span>Complexidade {task.complexity ? task.complexity.toLocaleLowerCase() : 'a estimar'}</span>
+          {Boolean(task.dependsOnIds?.length) && <><span className="dot">•</span><span>{task.dependsOnIds!.length} dependência{task.dependsOnIds!.length > 1 ? 's' : ''}</span></>}
+        </div>
       </div>
       <div className="task-card-actions">
         <DotsSixVertical className="drag-grip" size={16} />
