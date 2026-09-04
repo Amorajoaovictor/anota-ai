@@ -9,3 +9,6 @@ certificates
 # Artefatos de build do Next e do TypeScript
 next-env.d.ts
 tsconfig.tsbuildinfo
+
+# Browser profiles / cache do impeccable
+.impeccable/
