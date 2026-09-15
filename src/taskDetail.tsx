@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { complexities, priorities, projectTags, taskStatuses, type AppState, type Complexity, type Priority, type Task, type TaskStatus } from './domain'
-import { formatHistoryDate } from './format'
+import { formatDate, formatHistoryDate } from './format'
 import type { ProjectActions, TaskHistoryEntry } from './lib/store'
 import type { TaskPatch } from './lib/mapping'
 import { TaskMilestoneSelector } from './milestones'
@@ -60,8 +60,8 @@ export function TaskDetail({ task, state, loadHistory, onClose, onStatusChange, 
         <label className="ui-form-wide">Descrição<textarea value={draft.description} onChange={(event) => patch({ description: event.target.value })} placeholder="O que precisa ser feito, e por quê." /></label>
         <label>Módulo<input value={draft.module} onChange={(event) => patch({ module: event.target.value })} /></label>
         <label>Prioridade<select value={draft.priority} onChange={(event) => patch({ priority: event.target.value as Priority })}>{priorities.map((item) => <option key={item}>{item}</option>)}</select></label>
-        <label>Prazo confirmado<input value={draft.due} onChange={(event) => patch({ due: event.target.value })} placeholder="DD/MM" /></label>
-        <label>Previsão de entrega<input value={draft.forecast} onChange={(event) => patch({ forecast: event.target.value })} placeholder="DD/MM" /></label>
+        <label>Prazo confirmado<input type="date" value={draft.due} onChange={(event) => patch({ due: event.target.value })} /></label>
+        <label>Previsão de entrega<input type="date" value={draft.forecast} onChange={(event) => patch({ forecast: event.target.value })} /></label>
         <label>Complexidade<select value={draft.complexity} onChange={(event) => patch({ complexity: event.target.value as Complexity | '' })}>
           <option value="">A estimar</option>
           {complexities.map((item) => <option key={item}>{item}</option>)}
@@ -77,8 +77,8 @@ export function TaskDetail({ task, state, loadHistory, onClose, onStatusChange, 
           <div><small>TIPO</small><strong>{task.kind ?? 'Tarefa'}</strong></div>
           <div><small>PRIORIDADE</small><strong><PriorityPill priority={task.priority} /></strong></div>
           <div><small>COMPLEXIDADE</small><strong>{task.complexity ?? 'A estimar'}</strong></div>
-          <div><small>PRAZO</small><strong>{task.due ?? 'Sem prazo'}</strong></div>
-          <div><small>PREVISÃO</small><strong>{task.forecast ?? 'A estimar'}</strong></div>
+          <div><small>PRAZO</small><strong>{task.due ? formatDate(task.due) : 'Sem prazo'}</strong></div>
+          <div><small>PREVISÃO</small><strong>{task.forecast ? formatDate(task.forecast) : 'A estimar'}</strong></div>
         </div>
         {task.description && <section className="detail-block">
           <h3>Descrição</h3>

@@ -19,6 +19,7 @@ export type ExistingProposalReference = { id: string; expectedType: RetrievalRef
 
 export type MaterializationProviderResponse = {
   rawOutput: string
+  finishReason?: string
   provider: string
   model: string
   inputTokens: number
@@ -172,19 +173,42 @@ export async function materializeApprovedProposal(
   signal?: AbortSignal,
 ) {
   const request = buildMaterializationRequest(input)
-  const response = signal ? await provider.generate(request, signal) : await provider.generate(request)
-  const { rawOutput, ...attempt } = response
-  try {
-    const proposal = validateMaterializedProposal({
-      rawOutput,
-      approvedMarkdown: input.approvedMarkdown,
-      topics: input.topics,
-      retrievalSnapshot: input.retrievalSnapshot,
-    })
-    return { proposal, attempt, usedUnresolvedFallback: false }
-  } catch {
-    return { proposal: unresolvedFallback(input), attempt, usedUnresolvedFallback: true }
+  let currentRequest = request
+  let validationError = ''
+  let validationCode = 'MATERIALIZATION_SCHEMA_INVALID'
+  let attempt = { provider: '', model: '', inputTokens: 0, outputTokens: 0, latencyMs: 0 }
+  for (let index = 0; index < 2; index++) {
+    signal?.throwIfAborted()
+    const response = signal ? await provider.generate(currentRequest, signal) : await provider.generate(currentRequest)
+    signal?.throwIfAborted()
+    attempt = {
+      provider: response.provider, model: response.model,
+      inputTokens: attempt.inputTokens + response.inputTokens,
+      outputTokens: attempt.outputTokens + response.outputTokens,
+      latencyMs: attempt.latencyMs + response.latencyMs,
+    }
+    try {
+      if (response.finishReason === 'length') throw new Error('Resposta interrompida pelo limite de tokens. Gere JSON mais compacto, preservando todas as tarefas e evidências.')
+      const proposal = validateMaterializedProposal({
+        rawOutput: response.rawOutput,
+        approvedMarkdown: input.approvedMarkdown,
+        topics: input.topics,
+        retrievalSnapshot: input.retrievalSnapshot,
+      })
+      return { proposal, attempt, usedUnresolvedFallback: false, validationCode: null }
+    } catch (error) {
+      validationError = error instanceof Error ? error.message.slice(0, 2_000) : 'Proposta inválida.'
+      validationCode = response.finishReason === 'length' ? 'MATERIALIZATION_OUTPUT_TRUNCATED' : 'MATERIALIZATION_SCHEMA_INVALID'
+      currentRequest = {
+        ...request,
+        user: JSON.stringify({ ...JSON.parse(request.user), validationError }),
+        system: `${request.system}\nA tentativa anterior falhou. Corrija o erro informado em validationError e gere novamente a proposta completa somente a partir do Markdown aprovado. Não invente fatos nem relaxe o contrato.`,
+      }
+    }
   }
+  const proposal = unresolvedFallback(input)
+  proposal.unresolved = proposal.unresolved.map((item) => ({ ...item, reason: `Falha após duas tentativas: ${validationError}`.slice(0, 2_000) }))
+  return { proposal, attempt, usedUnresolvedFallback: true, validationCode }
 }
 
 function unresolvedFallback(input: MaterializationRequestInput & { topics: MaterializationTopic[] }): HarnessProposalV1 {

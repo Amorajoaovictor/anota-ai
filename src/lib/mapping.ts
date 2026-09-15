@@ -1,5 +1,4 @@
 import {
-  toDayMonth,
   withDerivedProgress,
   type AppState,
   type Complexity,
@@ -308,20 +307,16 @@ export function toDbComplexity(complexity: Complexity | undefined): number | nul
 }
 
 /**
- * A UI trabalha com `DD/MM` (o roadmap grava a chave do dia nesse formato). O ano
- * vem do ano corrente na escrita — data completa só na agenda da Fase 5.
+ * Prazo e previsão usam `YYYY-MM-DD`, preservando o ano na agenda e no banco.
  */
-export function toDbDue(due: string | undefined, today = new Date()): string | null {
+export function toDbDue(due: string | undefined): string | null {
   if (!due?.trim()) return null
-  const [day, month] = due.trim().split('/').map(Number)
-  if (!day || !month || month > 12 || day > 31) return null
-  const date = new Date(Date.UTC(today.getFullYear(), month - 1, day))
-  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+  const date = toDbDate(due)
+  return date?.toISOString() ?? null
 }
 
 export function formatDue(value: string | Date | null | undefined): string | undefined {
-  const date = toDate(value)
-  return date ? toDayMonth(date) : undefined
+  return formatDateInput(value)
 }
 
 export function toDbMilestoneStatus(status: MilestoneStatus): string {

@@ -2,7 +2,7 @@
 
 import { CalendarBlank, Plus, Target } from '@phosphor-icons/react'
 import { scopeProject, scopeTasks, type AppState, type Scope, type Task } from './domain'
-import { compareDue } from './format'
+import { compareDue, formatDate } from './format'
 import { Heading } from './heading'
 import type { TaskCreateDefaults } from './taskCreate'
 import { Button, PriorityPill } from './ui'
@@ -24,7 +24,7 @@ export function DeadlinesView({ state, scope, onOpen, onCreateTask }: { state: A
     />
     <div className="deadline-groups">
       {byDay.map((due) => <section className="deadline-group" key={due}>
-        <header><strong>{due}</strong><span>{scheduled.filter((task) => task.due === due).length} tarefas</span></header>
+        <header><strong>{formatDate(due)}</strong><span>{scheduled.filter((task) => task.due === due).length} tarefas</span></header>
         <div className="deadline-grid">
           {scheduled.filter((task) => task.due === due).map((task) => <button className="deadline-card" key={task.id} onClick={() => onOpen(task)} style={{ '--project-color': task.color } as React.CSSProperties}>
             <i />

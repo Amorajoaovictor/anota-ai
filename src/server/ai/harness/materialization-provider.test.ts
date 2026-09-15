@@ -9,6 +9,14 @@ const request = {
 }
 
 describe('adapter DeepSeek da LLM 2', () => {
+  // Protege contra JSON cortado tratado como proposta completa, perdendo tasks silenciosamente.
+  it('preserva motivo de término para detectar truncamento', async () => {
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      choices: [{ finish_reason: 'length', message: { content: '{"items":[' } }],
+    }), { status: 200 }))
+    const result = await new DeepSeekMaterializationProvider({ apiKey: 'test', fetchImpl }).generate(request)
+    expect(result).toMatchObject({ finishReason: 'length' })
+  })
   /**
    * Protege: segunda chamada usa request construido pelo harness, JSON e zero tools.
    * Detecta: provider reintroduzindo transcricao ou classificador single-shot.

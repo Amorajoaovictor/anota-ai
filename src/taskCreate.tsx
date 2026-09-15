@@ -116,8 +116,8 @@ export function TaskCreateDialog({ state, scope, defaults, onClose, onCreate }: 
       <label>Módulo<input value={draft.module} onChange={(event) => patch({ module: event.target.value })} placeholder="Geral" /></label>
       <label>Tipo<select value={draft.kind} onChange={(event) => patch({ kind: event.target.value as EntryKind })}>{entryKinds.map((item) => <option key={item}>{item}</option>)}</select></label>
       <label>Prioridade<select value={draft.priority} onChange={(event) => patch({ priority: event.target.value as Priority })}>{priorities.map((item) => <option key={item}>{item}</option>)}</select></label>
-      <label>Prazo confirmado<input value={draft.due} onChange={(event) => patch({ due: event.target.value })} placeholder="DD/MM" /></label>
-      <label>Previsão de entrega<input value={draft.forecast} onChange={(event) => patch({ forecast: event.target.value })} placeholder="DD/MM" /></label>
+      <label>Prazo confirmado<input type="date" value={draft.due} onChange={(event) => patch({ due: event.target.value })} /></label>
+      <label>Previsão de entrega<input type="date" value={draft.forecast} onChange={(event) => patch({ forecast: event.target.value })} /></label>
       <label className="ui-form-wide">Descrição<textarea value={draft.description} onChange={(event) => patch({ description: event.target.value })} placeholder="Contexto, passos para reproduzir, links..." /></label>
     </div>
 

@@ -44,7 +44,7 @@ export class DeepSeekMaterializationProvider implements MaterializationProvider 
     })
     if (!response.ok) throw new Error(`DeepSeek materializer respondeu ${response.status}.`)
     const payload = await response.json() as {
-      choices?: Array<{ message?: { content?: string } }>
+      choices?: Array<{ finish_reason?: string; message?: { content?: string } }>
       usage?: { prompt_tokens?: number; completion_tokens?: number }
       model?: string
     }
@@ -52,6 +52,7 @@ export class DeepSeekMaterializationProvider implements MaterializationProvider 
     if (!rawOutput) throw new Error('DeepSeek materializer nao devolveu conteudo.')
     return {
       rawOutput: stripCodeFence(rawOutput),
+      ...(payload.choices?.[0]?.finish_reason ? { finishReason: payload.choices[0].finish_reason } : {}),
       provider: 'deepseek',
       model: payload.model ?? this.model,
       inputTokens: payload.usage?.prompt_tokens ?? 0,

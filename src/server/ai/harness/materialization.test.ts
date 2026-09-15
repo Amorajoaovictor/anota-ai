@@ -32,6 +32,55 @@ const references = createReferenceOnlySnapshot('run-1', 'markdown-1', [{
 }])
 
 describe('Fase 6 — materialização strict', () => {
+  // Protege recuperação de tasks após resposta inválida, sem aceitar dados fora do contrato.
+  // Detecta fallback prematuro e repetição ilimitada; evita revisão vazia para o usuário.
+  it('corrige uma resposta inválida com uma única nova chamada e soma uso', async () => {
+    const metrics = { provider: 'fake', model: 'fake', inputTokens: 20, outputTokens: 10, latencyMs: 5 }
+    const provider = { generate: vi.fn()
+      .mockResolvedValueOnce({ ...metrics, rawOutput: '{' })
+      .mockResolvedValueOnce({ ...metrics, rawOutput: JSON.stringify({ schemaVersion: 1, summary: 'Tarefa', items: [task('task-1', 'Criar protótipo')], unresolved: [] }) }) }
+    const result = await materializeApprovedProposal(provider, {
+      approvedMarkdown: 'Criar protótipo', approvedMarkdownHash: 'hash-1', retrievalSnapshot: references,
+      now: '2026-07-31T12:00:00-03:00', timezone: 'America/Sao_Paulo', topics: [{ id: 'topic-meeting' }],
+    })
+    expect(provider.generate).toHaveBeenCalledTimes(2)
+    expect(JSON.parse(provider.generate.mock.calls[1][0].user).validationError).toContain('JSON')
+    expect(result.proposal.items).toHaveLength(1)
+    expect(result.usedUnresolvedFallback).toBe(false)
+    expect(result.attempt).toMatchObject({ inputTokens: 40, outputTokens: 20, latencyMs: 10 })
+  })
+
+  // Protege completude: até JSON válido pode ter sido cortado antes das demais tasks.
+  // Detecta aceitação de finish_reason=length e evita criação de uma lista incompleta.
+  it('não aceita resposta truncada e limita recuperação a duas chamadas', async () => {
+    const provider = { generate: vi.fn().mockResolvedValue({
+      rawOutput: JSON.stringify({ schemaVersion: 1, summary: 'Tarefa', items: [task('task-1', 'Criar protótipo')], unresolved: [] }),
+      finishReason: 'length', provider: 'fake', model: 'fake', inputTokens: 20, outputTokens: 10, latencyMs: 5,
+    }) }
+    const result = await materializeApprovedProposal(provider, {
+      approvedMarkdown: 'Criar protótipo', approvedMarkdownHash: 'hash-1', retrievalSnapshot: references,
+      now: '2026-07-31T12:00:00-03:00', timezone: 'America/Sao_Paulo', topics: [{ id: 'topic-meeting' }],
+    })
+    expect(provider.generate).toHaveBeenCalledTimes(2)
+    expect(result.proposal.items).toHaveLength(0)
+    expect(result.validationCode).toBe('MATERIALIZATION_OUTPUT_TRUNCATED')
+    expect(result.proposal.unresolved[0].reason).toContain('limite de tokens')
+  })
+
+  // Protege cancelamento: não gastar nova chamada nem publicar fallback após cancelamento.
+  it('interrompe recuperação quando o job é cancelado', async () => {
+    const controller = new AbortController()
+    const provider = { generate: vi.fn().mockImplementation(async () => {
+      controller.abort(new Error('cancelado'))
+      return { rawOutput: '{', provider: 'fake', model: 'fake', inputTokens: 1, outputTokens: 1, latencyMs: 1 }
+    }) }
+    await expect(materializeApprovedProposal(provider, {
+      approvedMarkdown: 'Criar protótipo', approvedMarkdownHash: 'hash-1', retrievalSnapshot: references,
+      now: '2026-07-31T12:00:00-03:00', timezone: 'America/Sao_Paulo', topics: [{ id: 'topic-meeting' }],
+    }, controller.signal)).rejects.toThrow('cancelado')
+    expect(provider.generate).toHaveBeenCalledTimes(1)
+  })
+
   /**
    * Protege H04: um tópico pode gerar reunião e várias tarefas.
    * Detecta: cardinalidade um-para-um introduzida no schema.
@@ -228,6 +277,8 @@ describe('Fase 6 — materialização strict', () => {
       unresolved: [{ topicId: 'topic-meeting', evidence: [{ quote: 'Criar protótipo' }] }],
     })
     expect(result.usedUnresolvedFallback).toBe(true)
+    expect(provider.generate).toHaveBeenCalledTimes(2)
+    expect(result.proposal.unresolved[0].reason).toContain('Proposta inválida')
   })
 
   /**

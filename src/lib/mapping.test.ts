@@ -102,7 +102,7 @@ describe('tradução entre banco e domínio', () => {
       kind: 'Bug',
       complexity: 'Média',
       module: 'Mapa',
-      due: '24/07',
+      due: '2026-07-24',
       dependsOnIds: ['task-2'],
       color: '#68d7a7',
     })
@@ -127,11 +127,11 @@ describe('tradução entre banco e domínio', () => {
     expect(toTaskPatchBody({ complexity: undefined })).toEqual({})
   })
 
-  it('faz ida e volta de DD/MM usando o ano corrente', () => {
-    const iso = toDbDue('24/07', new Date(2026, 0, 1))
+  it('preserva data completa de prazo e previsão', () => {
+    const iso = toDbDue('2026-07-24')
 
     expect(iso).toBe('2026-07-24T00:00:00.000Z')
-    expect(formatDue(iso)).toBe('24/07')
+    expect(formatDue(iso)).toBe('2026-07-24')
     expect(toDbDue('')).toBeNull()
     expect(toDbDue('99/99')).toBeNull()
   })
@@ -161,12 +161,12 @@ describe('tradução entre banco e domínio', () => {
 
     expect(task.description).toBeUndefined()
     expect(task.forecast).toBeUndefined()
-    expect(toDomainTask(dbTask({ forecastAt: '2026-08-04T00:00:00.000Z' })).forecast).toBe('04/08')
+    expect(toDomainTask(dbTask({ forecastAt: '2026-08-04T00:00:00.000Z' })).forecast).toBe('2026-08-04')
   })
 
   it('previsão e prazo viajam em campos separados', () => {
-    expect(toTaskPatchBody({ due: '24/07', forecast: '' }).forecastAt).toBeNull()
-    expect(toTaskPatchBody({ forecast: '04/08' }).dueAt).toBeUndefined()
+    expect(toTaskPatchBody({ due: '2026-07-24', forecast: '' }).forecastAt).toBeNull()
+    expect(toTaskPatchBody({ forecast: '2026-08-04' }).dueAt).toBeUndefined()
   })
 
   it('marco usa data completa, não o DD/MM do prazo', () => {

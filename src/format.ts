@@ -22,7 +22,5 @@ export function splitList(value: string): string[] {
 }
 
 export function compareDue(left: string, right: string) {
-  const [leftDay, leftMonth] = left.split('/')
-  const [rightDay, rightMonth] = right.split('/')
-  return `${leftMonth}${leftDay}`.localeCompare(`${rightMonth}${rightDay}`)
+  return left.localeCompare(right)
 }

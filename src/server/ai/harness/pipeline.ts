@@ -201,7 +201,7 @@ export async function processMaterializationJob(
           outputTokens: generated.attempt.outputTokens,
           latencyMs: generated.attempt.latencyMs,
           technicalResult: generated.usedUnresolvedFallback ? 'FALLBACK_UNRESOLVED' : 'SUCCESS',
-          errorCode: generated.usedUnresolvedFallback ? 'MATERIALIZATION_SCHEMA_INVALID' : null,
+          errorCode: generated.validationCode,
         },
       })
       return revision

@@ -25,7 +25,7 @@ export function buildRoadmapWeek(anchor: Date, today = new Date()): RoadmapDay[]
     date.setDate(start.getDate() + index)
     return {
       date,
-      key: `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`,
+      key: `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`,
       weekday: weekdays[date.getDay()],
       day: date.getDate(),
       month: months[date.getMonth()],
@@ -62,7 +62,7 @@ export function groupMilestonesByRoadmapDay(milestones: Milestone[], days: Roadm
   milestones.forEach((milestone) => {
     const date = parseIsoDate(milestone.targetDate)
     if (!date) return
-    const key = `${String(date.getDate()).padStart(2, '0')}/${String(date.getMonth() + 1).padStart(2, '0')}`
+    const key = milestone.targetDate
     scheduled.get(key)?.push(milestone)
   })
   return days.map((day) => ({

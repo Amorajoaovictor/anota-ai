@@ -70,7 +70,7 @@ export function RoadmapView({ state, scope, actions, notify, onOpen, onCreateTas
           onSelectMilestone={setSelectedMilestoneId}
           onSchedule={schedule}
           onOpen={onOpen}
-          // `day.key` é DD/MM, mesmo formato que o arraste grava em `due`.
+          // `day.key` é YYYY-MM-DD, mesmo formato persistido em `due`.
           onCreate={() => onCreateTask({ due: day.key })}
         />)}
       </div>
@@ -161,6 +161,6 @@ function RoadmapCard({ task, from, milestones, onOpen, compact = false }: { task
     <strong>{task.title}</strong>
     <MilestoneBadges milestoneIds={task.milestoneIds} milestones={milestones} />
     <small>{task.module ?? 'Geral'} · {task.status}</small>
-    <span className="roadmap-demand-time"><Clock size={13} />{task.due ?? 'Sem prazo'}<em>{task.complexity ?? 'A estimar'}</em></span>
+    <span className="roadmap-demand-time"><Clock size={13} />{task.due ? formatDate(task.due) : 'Sem prazo'}<em>{task.complexity ?? 'A estimar'}</em></span>
   </div>
 }
