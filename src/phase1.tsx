@@ -11,6 +11,7 @@ import type { ProjectActions } from './lib/store'
 import type { TaskPatch } from './lib/mapping'
 import { IntegrationsView } from './integrations'
 import { MilestonesView } from './milestones'
+import { MeetingsView } from './meetings'
 import { NotesView } from './notes'
 import { ContextView } from './projectContext'
 import { ProjectOverview } from './projectOverview'
@@ -21,12 +22,12 @@ import { TaskDetail } from './taskDetail'
 import type { TaskCreateDefaults } from './taskCreate'
 import { EmptyState, Button, type Notify } from './ui'
 
-export type Phase1Section = 'Projetos' | 'Planilha' | 'Kanban' | 'Marcos' | 'Roadmap' | 'Prazos' | 'Calendário' | 'Notas' | 'Caixa de entrada' | 'Revisão IA' | 'Integrações'
+export type Phase1Section = 'Projetos' | 'Planilha' | 'Kanban' | 'Marcos' | 'Reuniões' | 'Roadmap' | 'Prazos' | 'Calendário' | 'Notas' | 'Caixa de entrada' | 'Revisão IA' | 'Integrações'
 
 /** Seções que existem dentro de um projeto. Ver `arquitetura-navegacao.md`. */
-export type ProjectSection = 'Visão geral' | 'Planilha' | 'Kanban' | 'Marcos' | 'Roadmap' | 'Prazos' | 'Calendário' | 'Notas' | 'Contexto'
+export type ProjectSection = 'Visão geral' | 'Planilha' | 'Kanban' | 'Marcos' | 'Reuniões' | 'Roadmap' | 'Prazos' | 'Calendário' | 'Notas' | 'Contexto'
 
-export const projectSections: ProjectSection[] = ['Visão geral', 'Planilha', 'Kanban', 'Marcos', 'Roadmap', 'Prazos', 'Calendário', 'Notas', 'Contexto']
+export const projectSections: ProjectSection[] = ['Visão geral', 'Planilha', 'Kanban', 'Marcos', 'Reuniões', 'Roadmap', 'Prazos', 'Calendário', 'Notas', 'Contexto']
 
 export function Phase1View({ section, scope, state, setState, actions, notify, onBack, onOpenProject, onCreateTask, openTaskId, onOpenTask, onCloseTask }: { section: Phase1Section | ProjectSection; scope: Scope; state: AppState; setState: (state: AppState) => void; actions: ProjectActions; notify: Notify; onBack: () => void; onOpenProject: (projectId: string) => void; onCreateTask: (defaults?: TaskCreateDefaults) => void; openTaskId: string | null; onOpenTask: (task: Task) => void; onCloseTask: () => void }) {
   // O detalhe lê do estado, não de uma cópia: assim o rollback de uma escrita
@@ -58,6 +59,7 @@ export function Phase1View({ section, scope, state, setState, actions, notify, o
     if (section === 'Planilha') return <SpreadsheetView state={state} scope={scope} onOpen={openTask} onCreateTask={onCreateTask} />
     if (section === 'Kanban') return <KanbanView state={state} scope={scope} actions={actions} onOpen={openTask} onStatusChange={changeStatus} onCreateTask={onCreateTask} />
     if (section === 'Marcos') return <MilestonesView state={state} scope={scope} setState={setState} actions={actions} notify={notify} onOpenTask={openTask} />
+    if (section === 'Reuniões') return <MeetingsView state={state} scope={scope} actions={actions} />
     if (section === 'Roadmap') return <><Heading level="section" title="Roadmap" icon={<MapTrifold size={34} />} /><RoadmapView state={state} scope={scope} actions={actions} notify={notify} onOpen={openTask} onCreateTask={onCreateTask} /></>
     if (section === 'Prazos') return <DeadlinesView state={state} scope={scope} onOpen={openTask} onCreateTask={onCreateTask} />
     if (section === 'Calendário') return <CalendarView state={state} scope={scope} onOpenTask={openTask} />

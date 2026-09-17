@@ -813,6 +813,24 @@ button.calendar-entry:hover { filter: brightness(1.2); }
 
 /* ---------- Notas ---------- */
 
+/* ---------- Reuniões ---------- */
+
+.meetings-list { display: grid; gap: 10px; max-width: var(--page-max); margin: 0 auto; padding: 0 var(--gutter) 42px; }
+.meeting-card { display: grid; grid-template-columns: 170px minmax(0, 1fr) auto; gap: 18px; align-items: start; padding: 18px; }
+.meeting-date { display: grid; gap: 7px; color: var(--green); font-size: var(--t-meta); text-transform: capitalize; }
+.meeting-date time { color: var(--text); font: 600 16px 'Space Grotesk', sans-serif; }
+.meeting-main { display: grid; gap: 7px; }
+.meeting-main small { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--t-meta); }
+.meeting-main small i { width: 7px; height: 7px; border-radius: 50%; }
+.meeting-main h2 { margin: 0; font: 600 17px 'Space Grotesk', sans-serif; }
+.meeting-main p { margin: 0; color: var(--text-2); font-size: var(--t-body); line-height: var(--lh-body); white-space: pre-wrap; }
+.meeting-main > span { display: inline-flex; align-items: center; gap: 6px; color: var(--muted); font-size: var(--t-meta); }
+.meeting-main a { width: max-content; color: var(--green); font-size: var(--t-meta); }
+.meeting-actions { display: flex; gap: 5px; }
+.meeting-actions button { display: grid; place-items: center; width: 32px; height: 32px; border: 0; border-radius: var(--r-sm); background: transparent; color: var(--muted); }
+.meeting-actions button:hover { background: var(--surface-3); color: var(--text); }
+@media (max-width: 760px) { .meeting-card { grid-template-columns: 1fr auto; gap: 12px; }.meeting-date { grid-column: 1; }.meeting-main { grid-column: 1 / -1; }.meeting-actions { grid-column: 2; grid-row: 1; } }
+
 .keep-section > h2 { display: flex; align-items: center; gap: 6px; }
 .keep-section.drop-active { outline: 1px dashed var(--green-line); outline-offset: 10px; border-radius: var(--r-md); }
 .keep-section-hint { margin: 0; padding: 26px 0; text-align: center; color: var(--faint); font-size: var(--t-label); }

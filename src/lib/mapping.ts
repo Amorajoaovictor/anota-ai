@@ -8,6 +8,7 @@ import {
   type InboxStatus,
   type Milestone,
   type MilestoneStatus,
+  type Meeting,
   type Note,
   type Priority,
   type Project,
@@ -168,6 +169,19 @@ export type DbInboxItem = {
   aiRuns?: Array<{ id: string; status?: string }>
 }
 
+export type DbMeeting = {
+  id: string
+  projectId: string | null
+  title: string
+  description: string
+  startsAt: string | Date
+  endsAt: string | Date | null
+  durationMinutes: number | null
+  timezone: string
+  link: string | null
+  project: { name: string; color: string } | null
+}
+
 export function toDomainTag(tag: DbTag): Tag {
   return { id: tag.id, name: tag.name, color: tag.color }
 }
@@ -263,6 +277,22 @@ export function toDomainInbox(item: DbInboxItem): InboxItem {
   }
 }
 
+export function toDomainMeeting(meeting: DbMeeting): Meeting {
+  return {
+    id: meeting.id,
+    projectId: meeting.projectId ?? undefined,
+    project: meeting.project?.name,
+    color: meeting.project?.color,
+    title: meeting.title,
+    description: meeting.description,
+    startsAt: new Date(meeting.startsAt).toISOString(),
+    endsAt: meeting.endsAt ? new Date(meeting.endsAt).toISOString() : undefined,
+    durationMinutes: meeting.durationMinutes ?? undefined,
+    timezone: meeting.timezone,
+    link: meeting.link ?? undefined,
+  }
+}
+
 /**
  * Estado inicial da UI. Marco entra somente para leitura: criar e editar marco é Fase 5.
  */
@@ -273,6 +303,7 @@ export function toAppState(
   notes: DbNote[] = [],
   contexts: DbContext[] = [],
   inbox: DbInboxItem[] = [],
+  meetings: DbMeeting[] = [],
 ): AppState {
   const domainTasks = tasks.map(toDomainTask)
   return withDerivedProgress({
@@ -280,6 +311,7 @@ export function toAppState(
     tasks: domainTasks,
     actionPlan: domainTasks.filter((task) => task.status !== 'Concluída' && task.status !== 'Cancelada'),
     milestones: milestones.map(toDomainMilestone),
+    meetings: meetings.map(toDomainMeeting).sort((left, right) => left.startsAt.localeCompare(right.startsAt)),
     // `reorderNotes` assume ordem do array igual à ordem das posições.
     notes: notes.map(toDomainNote).sort((left, right) => left.position - right.position),
     contexts: contexts.map(toDomainContext),

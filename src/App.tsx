@@ -25,7 +25,7 @@ type NavItem = { label: Section; icon: typeof House }
 
 const nav: NavItem[] = [
   { label: 'Hoje', icon: House }, { label: 'Projetos', icon: Archive }, { label: 'Planilha', icon: Table },
-  { label: 'Kanban', icon: KanbanIcon }, { label: 'Marcos', icon: Flag }, { label: 'Roadmap', icon: MapTrifold }, { label: 'Prazos', icon: CalendarBlank }, { label: 'Calendário', icon: CalendarBlank },
+  { label: 'Kanban', icon: KanbanIcon }, { label: 'Marcos', icon: Flag }, { label: 'Roadmap', icon: MapTrifold }, { label: 'Prazos', icon: CalendarBlank }, { label: 'Calendário', icon: CalendarBlank }, { label: 'Reuniões', icon: CalendarBlank },
   { label: 'Notas', icon: NotePencil }, { label: 'Caixa de entrada', icon: Tray }, { label: 'Revisão IA', icon: Sparkle }, { label: 'Integrações', icon: Gear },
 ]
 
@@ -35,7 +35,7 @@ const at = (label: Section) => navByLabel.get(label)!
 /** Agrupamento visual da sidebar. Ver Fase 5 do passo de UI/UX. */
 const navGroups: { group?: string; items: NavItem[] }[] = [
   { items: [at('Hoje'), at('Projetos')] },
-  { group: 'TRABALHO', items: [at('Planilha'), at('Kanban'), at('Roadmap'), at('Prazos'), at('Calendário'), at('Marcos')] },
+  { group: 'TRABALHO', items: [at('Planilha'), at('Kanban'), at('Roadmap'), at('Prazos'), at('Calendário'), at('Reuniões'), at('Marcos')] },
   { group: 'ENTRADA', items: [at('Caixa de entrada'), at('Revisão IA'), at('Notas')] },
   { group: 'SISTEMA', items: [at('Integrações')] },
 ]

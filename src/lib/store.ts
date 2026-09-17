@@ -4,6 +4,7 @@ import { useCallback, useRef, useState } from 'react'
 import {
   addContext,
   addInboxItem,
+  addMeeting,
   addNote,
   addProject,
   addProjectAlias,
@@ -16,6 +17,7 @@ import {
   moveTaskTo,
   pendingInboxStatuses,
   removeContext as removeContextInState,
+  removeMeeting as removeMeetingInState,
   removeProjectAlias,
   removeProjectModule,
   reorderNotes,
@@ -25,6 +27,7 @@ import {
   toggleNotePinned,
   toggleProjectArchived,
   updateContext as updateContextInState,
+  updateMeeting as updateMeetingInState,
   updateInboxSuggestion,
   updateNote as updateNoteInState,
   updateProject as updateProjectInState,
@@ -32,6 +35,7 @@ import {
   withDerivedProgress,
   type AppState,
   type ContextSuggestion,
+  type Meeting,
   type Note,
   type Priority,
   type ProjectContextEntry,
@@ -50,6 +54,7 @@ import {
   toDbModule,
   toDomainContext,
   toDomainInbox,
+  toDomainMeeting,
   toDomainNote,
   toDomainProject,
   toDomainTask,
@@ -60,6 +65,7 @@ import {
   toTaskPatchBody,
   type DbContext,
   type DbInboxItem,
+  type DbMeeting,
   type DbNote,
   type DbProject,
   type DbTask,
@@ -357,6 +363,44 @@ export function useProjectData(initial: AppState, notify: Notify) {
       })
     },
 
+    createMeeting(input: { projectId?: string | null; title: string; description?: string; startsAt: string; endsAt?: string | null; durationMinutes?: number | null; timezone: string; link?: string | null }) {
+      return mutate({
+        apply: (current) => addMeeting(current, input),
+        invalid: 'Informe título e horário válidos',
+        success: 'Reunião criada',
+        persist: ({ before, after }) => {
+          const created = added(before.meetings, after.meetings)
+          return created ? postJson<{ meeting: DbMeeting }>('/api/meetings', meetingBody(created)) : Promise.resolve(null)
+        },
+        reconcile: (current, result, { before, after }) => {
+          const created = added(before.meetings, after.meetings)
+          return result && created ? replaceMeeting(current, created.id, toDomainMeeting(result.meeting)) : current
+        },
+      })
+    },
+
+    saveMeeting(meetingId: string, input: { projectId?: string | null; title?: string; description?: string; startsAt?: string; endsAt?: string | null; durationMinutes?: number | null; timezone?: string; link?: string | null }) {
+      return mutate({
+        apply: (current) => updateMeetingInState(current, meetingId, input),
+        invalid: 'Dados da reunião inválidos',
+        success: 'Reunião atualizada',
+        persist: ({ after }) => {
+          const meeting = after.meetings.find((item) => item.id === meetingId)
+          return meeting ? patchJson<{ meeting: DbMeeting }>(`/api/meetings/${meetingId}`, meetingBody(meeting)) : Promise.resolve(null)
+        },
+        reconcile: (current, result) => result ? replaceMeeting(current, meetingId, toDomainMeeting(result.meeting)) : current,
+      })
+    },
+
+    removeMeeting(meetingId: string) {
+      return mutate({
+        apply: (current) => removeMeetingInState(current, meetingId),
+        invalid: 'Reunião não encontrada',
+        success: 'Reunião removida',
+        persist: () => deleteJson(`/api/meetings/${meetingId}`),
+      })
+    },
+
     createNote(input: { title: string; content: string; projectId: string; taskId?: string }) {
       return mutate({
         apply: (current) => addNote(current, input),
@@ -540,6 +584,23 @@ function replaceNote(state: AppState, temporaryId: string, note: Note): AppState
   return {
     ...state,
     notes: state.notes.map((item) => item.id === temporaryId ? note : item),
+  }
+}
+
+function replaceMeeting(state: AppState, temporaryId: string, meeting: Meeting): AppState {
+  return { ...state, meetings: state.meetings.map((item) => item.id === temporaryId ? meeting : item).sort((left, right) => left.startsAt.localeCompare(right.startsAt)) }
+}
+
+function meetingBody(meeting: Meeting) {
+  return {
+    projectId: meeting.projectId ?? null,
+    title: meeting.title,
+    description: meeting.description,
+    startsAt: meeting.startsAt,
+    endsAt: meeting.endsAt ?? null,
+    durationMinutes: meeting.durationMinutes ?? null,
+    timezone: meeting.timezone,
+    link: meeting.link ?? null,
   }
 }
 

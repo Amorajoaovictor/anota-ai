@@ -1,12 +1,13 @@
 import { redirect } from 'next/navigation'
 import App from '../App'
 import { requireCurrentUser } from '../lib/auth/server'
-import { toAppState, type DbContext, type DbInboxItem, type DbMilestone, type DbNote, type DbProject, type DbTask } from '../lib/mapping'
+import { toAppState, type DbContext, type DbInboxItem, type DbMeeting, type DbMilestone, type DbNote, type DbProject, type DbTask } from '../lib/mapping'
 import { getPrisma } from '../lib/prisma'
 import { listContexts } from '../server/contexts'
 import { UnauthorizedError } from '../server/http'
 import { listInboxItems } from '../server/inbox'
 import { listMilestones } from '../server/milestones'
+import { listMeetings } from '../server/meetings'
 import { listNotes } from '../server/notes'
 import { listProjects } from '../server/projects'
 import { listTasks } from '../server/tasks'
@@ -28,13 +29,14 @@ export default async function HomePage() {
   const ownerId = user.id
 
   const prisma = getPrisma()
-  const [projects, tasks, milestones, notes, contexts, inbox] = await Promise.all([
+  const [projects, tasks, milestones, notes, contexts, inbox, meetings] = await Promise.all([
     listProjects(prisma, ownerId),
     listTasks(prisma, ownerId),
     listMilestones(prisma, ownerId),
     listNotes(prisma, ownerId),
     listContexts(prisma, ownerId),
     listInboxItems(prisma, ownerId),
+    listMeetings(prisma, ownerId),
   ])
 
   return <App
@@ -45,6 +47,7 @@ export default async function HomePage() {
       notes as DbNote[],
       contexts as DbContext[],
       inbox as DbInboxItem[],
+      meetings as DbMeeting[],
     )}
     user={user}
   />

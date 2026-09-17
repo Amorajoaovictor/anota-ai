@@ -49,6 +49,7 @@ const state: AppState = {
   tasks: [],
   actionPlan: [],
   milestones: [],
+  meetings: [],
   notes: [],
   contexts: [],
   activity: [],

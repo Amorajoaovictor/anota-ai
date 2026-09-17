@@ -7,6 +7,7 @@ import {
   toDbDue,
   toDomainInbox,
   toDomainMilestone,
+  toDomainMeeting,
   toDomainNote,
   toDomainTask,
   toProjectPatchBody,
@@ -15,6 +16,7 @@ import {
   type DbContext,
   type DbInboxItem,
   type DbMilestone,
+  type DbMeeting,
   type DbNote,
   type DbProject,
   type DbTask,
@@ -73,6 +75,12 @@ const dbNote = (overrides: Partial<DbNote> = {}): DbNote => ({
   createdAt: '2026-07-26T12:30:00.000Z',
   convertedTask: null,
   ...overrides,
+})
+
+const dbMeeting = (overrides: Partial<DbMeeting> = {}): DbMeeting => ({
+  id: 'meeting-1', projectId: 'project-1', title: 'Alinhamento', description: 'Definir próximos passos.',
+  startsAt: '2026-09-15T10:00:00.000Z', endsAt: null, durationMinutes: 30, timezone: 'America/Sao_Paulo', link: null,
+  project: { name: 'VistaFor', color: '#68d7a7' }, ...overrides,
 })
 
 const dbContext = (overrides: Partial<DbContext> = {}): DbContext => ({
@@ -235,6 +243,11 @@ describe('tradução entre banco e domínio', () => {
 
   it('entrada sem sugestão ainda mapeia para undefined', () => {
     expect(toDomainInbox(dbInboxItem({ suggestion: null, status: 'RECEIVED' })).suggestion).toBeUndefined()
+  })
+
+  it('traduz reunião com projeto opcional sem vazar enum ou Date para a tela', () => {
+    expect(toDomainMeeting(dbMeeting())).toMatchObject({ projectId: 'project-1', project: 'VistaFor', startsAt: '2026-09-15T10:00:00.000Z', durationMinutes: 30 })
+    expect(toDomainMeeting(dbMeeting({ projectId: null, project: null, endsAt: null })).project).toBeUndefined()
   })
 
   /**

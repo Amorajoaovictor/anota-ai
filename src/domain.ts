@@ -99,6 +99,19 @@ export type Note = {
   position: number
   convertedTaskId?: string
 }
+export type Meeting = {
+  id: string
+  projectId?: string
+  project?: string
+  color?: string
+  title: string
+  description: string
+  startsAt: string
+  endsAt?: string
+  durationMinutes?: number
+  timezone: string
+  link?: string
+}
 
 /**
  * Informação de projeto disponível para IA e MCP, ao contrário da nota privada
@@ -134,7 +147,7 @@ export const priorities: Priority[] = ['P0', 'P1', 'P2', 'P3']
 export const entryKinds: EntryKind[] = ['Tarefa', 'Bug', 'Melhoria', 'Funcionalidade', 'Decisão', 'Solicitação externa', 'Ideia futura', 'Pergunta']
 export const complexities: Complexity[] = ['Baixa', 'Média', 'Alta']
 
-export type AppState = { tasks: Task[]; projects: Project[]; milestones: Milestone[]; actionPlan: Task[]; inbox: InboxItem[]; notes: Note[]; contexts: ProjectContextEntry[]; activity: string[] }
+export type AppState = { tasks: Task[]; projects: Project[]; milestones: Milestone[]; meetings: Meeting[]; actionPlan: Task[]; inbox: InboxItem[]; notes: Note[]; contexts: ProjectContextEntry[]; activity: string[] }
 export type TaskFilter = { project?: string; status?: TaskStatus; query?: string }
 export type MilestoneFilter = '' | 'unassigned' | string
 
@@ -162,6 +175,7 @@ const seedState: AppState = {
     { id: 'milestone-observa-dashboard', name: 'Dashboard ambiental', project: 'Observa SEUMA', targetDate: '2026-07-25', status: 'Planejado', description: 'Indicadores principais disponíveis para conferência.', color: '#64a3ff' },
     { id: 'milestone-intranet-acessos', name: 'Acessos revisados', project: 'Intranet', targetDate: '2026-07-24', status: 'Em andamento', description: 'Perfis e permissões institucionais validados.', color: '#aa8cff' },
   ],
+  meetings: [],
   tasks: [
     { id: 'task-1', title: 'Corrigir exclusão de medidas', description: 'Excluir uma medida no mapa não remove o registro correspondente na API.', project: 'VistaFor', module: 'Loteamentos / Mapa', kind: 'Bug', status: 'Backlog', priority: 'P0', complexity: 'Alta', due: '24/07', forecast: '29/07', color: '#68d7a7', milestoneIds: ['milestone-vistafor-mvp', 'milestone-vistafor-homologacao'], tagIds: ['tag-vistafor-cegeo'] },
     { id: 'task-2', title: 'Reproduzir erro e registrar resposta da API', project: 'VistaFor', module: 'API', kind: 'Bug', status: 'Em andamento', priority: 'P1', complexity: 'Média', dependsOnIds: ['task-1'], due: '24/07', color: '#68d7a7', milestoneIds: ['milestone-vistafor-mvp'], tagIds: ['tag-vistafor-raster'] },
@@ -561,6 +575,68 @@ export function addInboxItem(state: AppState, text: string): AppState {
   }
 }
 
+type MeetingInput = {
+  projectId?: string | null
+  title: string
+  description?: string
+  startsAt: string
+  endsAt?: string | null
+  durationMinutes?: number | null
+  timezone: string
+  link?: string | null
+}
+
+export function addMeeting(state: AppState, input: MeetingInput): AppState {
+  const title = input.title.trim()
+  const startsAt = new Date(input.startsAt)
+  const endsAt = input.endsAt ? new Date(input.endsAt) : undefined
+  const project = input.projectId ? state.projects.find((item) => item.id === input.projectId) : undefined
+  if (!title || Number.isNaN(startsAt.getTime()) || (input.endsAt && Number.isNaN(endsAt?.getTime())) || (endsAt && endsAt <= startsAt) || (input.projectId && !project)) return state
+  const meeting: Meeting = {
+    id: `meeting-${Date.now()}`,
+    projectId: project?.id,
+    project: project?.name,
+    color: project?.color,
+    title,
+    description: input.description?.trim() ?? '',
+    startsAt: startsAt.toISOString(),
+    endsAt: endsAt?.toISOString(),
+    durationMinutes: input.durationMinutes ?? undefined,
+    timezone: input.timezone,
+    link: input.link?.trim() || undefined,
+  }
+  return { ...state, meetings: [...state.meetings, meeting].sort((left, right) => left.startsAt.localeCompare(right.startsAt)), activity: [`Reunião "${meeting.title}" criada agora`, ...state.activity] }
+}
+
+export function updateMeeting(state: AppState, meetingId: string, input: Partial<MeetingInput>): AppState {
+  const current = state.meetings.find((meeting) => meeting.id === meetingId)
+  if (!current) return state
+  const project = input.projectId === undefined ? undefined : input.projectId ? state.projects.find((item) => item.id === input.projectId) : null
+  const title = input.title === undefined ? current.title : input.title.trim()
+  const startsAt = input.startsAt === undefined ? new Date(current.startsAt) : new Date(input.startsAt)
+  const endsAtValue = input.endsAt === undefined ? current.endsAt : input.endsAt
+  const endsAt = endsAtValue ? new Date(endsAtValue) : undefined
+  if (!title || !input.timezone?.trim() && input.timezone !== undefined || Number.isNaN(startsAt.getTime()) || (endsAtValue && Number.isNaN(endsAt?.getTime())) || (endsAt && endsAt <= startsAt) || (input.projectId && !project)) return state
+  const next: Meeting = {
+    ...current,
+    ...(input.projectId === undefined ? {} : { projectId: project?.id, project: project?.name, color: project?.color }),
+    title,
+    ...(input.description === undefined ? {} : { description: input.description.trim() }),
+    startsAt: startsAt.toISOString(),
+    endsAt: endsAt?.toISOString(),
+    ...(input.durationMinutes === undefined ? {} : { durationMinutes: input.durationMinutes ?? undefined }),
+    ...(input.timezone === undefined ? {} : { timezone: input.timezone.trim() }),
+    ...(input.link === undefined ? {} : { link: input.link?.trim() || undefined }),
+  }
+  return { ...state, meetings: state.meetings.map((meeting) => meeting.id === meetingId ? next : meeting).sort((left, right) => left.startsAt.localeCompare(right.startsAt)), activity: [`Reunião "${next.title}" atualizada agora`, ...state.activity] }
+}
+
+export function removeMeeting(state: AppState, meetingId: string): AppState {
+  const meeting = state.meetings.find((item) => item.id === meetingId)
+  if (!meeting) return state
+  return { ...state, meetings: state.meetings.filter((item) => item.id !== meetingId), activity: [`Reunião "${meeting.title}" removida agora`, ...state.activity] }
+}
+
 export function addNote(state: AppState, input: { title: string; content: string; projectId: string; taskId?: string }): AppState {
   const content = input.content.trim()
   const project = state.projects.find((item) => item.id === input.projectId)
@@ -801,6 +877,11 @@ export function scopeTasks(state: AppState, scope: Scope): Task[] {
 export function scopeMilestones(state: AppState, scope: Scope): Milestone[] {
   const names = new Set(scopeProjects(state, scope).map((project) => project.name))
   return state.milestones.filter((milestone) => names.has(milestone.project))
+}
+
+export function scopeMeetings(state: AppState, scope: Scope): Meeting[] {
+  if (scope.type === 'global') return state.meetings
+  return state.meetings.filter((meeting) => meeting.projectId === scope.projectId)
 }
 
 export function scopeNotes(state: AppState, scope: Scope): Note[] {
