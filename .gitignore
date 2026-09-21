@@ -12,3 +12,5 @@ tsconfig.tsbuildinfo
 
 # Browser profiles / cache do impeccable
 .impeccable/
+.vercel
+.env*

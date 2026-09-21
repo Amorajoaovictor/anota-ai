@@ -35,6 +35,14 @@ Acao recomendada:
 - Agendar `ai.sweep-audio` pelo menos uma vez por hora; ele remove somente orfaos com 24 horas ou mais e preserva arquivos de jobs ativos.
 - Nunca copiar audio temporario para `Attachment`.
 
+## Fila em producao (Vercel)
+
+- O worker de longa duracao nao roda dentro de uma funcao Vercel; `npm run worker` continua sendo o processo do host de desenvolvimento.
+- `GET /api/jobs/run` drena a fila com `Authorization: Bearer ${CRON_SECRET}` e e o caminho chamado pelo cron; `POST` continua exigindo `x-jobs-token`. Sem o segredo configurado, os dois respondem 404.
+- Plano Hobby so aceita cron diario: `vercel.json` agenda `0 3 * * *`. Em Pro, trocar para `* * * * *` e agendar `ai.sweep-audio` de hora em hora, como a secao anterior pede.
+- Sem cron sub-diario, o worker local apontando para a mesma `DATABASE_URL` mantem a fila drenada (o banco de producao e o mesmo do `.env.local`).
+- Anexos e audio em producao usam `STORAGE_DRIVER=vercel-blob` com store privada: o filesystem da funcao e somente leitura fora de `/tmp`, que e efemero por instancia.
+
 ## Retry, descarte e rollback
 
 - Retry clona payload, versao e hash do job falho; nao montar snapshot pelo cliente.

@@ -20,3 +20,12 @@ export function getNeonAuthConfig(environment: Record<string, string | undefined
   if (!baseUrl || !cookieSecret || cookieSecret.length < 32) return null
   return { baseUrl, cookieSecret }
 }
+
+/**
+ * Origem confiável do backend de autenticação. O Neon recusa com `INVALID_ORIGIN` qualquer
+ * `Origin` fora da lista da instância — e o domínio do deploy nunca está nela.
+ */
+export function getNeonAuthOrigin() {
+  const baseUrl = readNeonAuthEnvironment().NEON_AUTH_BASE_URL?.trim()
+  return baseUrl ? new URL(baseUrl).origin : null
+}

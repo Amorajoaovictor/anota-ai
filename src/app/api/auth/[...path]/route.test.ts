@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const handler = {
   GET: vi.fn(),
@@ -12,11 +12,19 @@ vi.mock('../../../../lib/auth/server', () => ({
 import { GET, POST } from './route'
 
 const contextFor = (path: string[]) => ({ params: Promise.resolve({ path }) })
+const authBaseUrl = 'https://projeto.neonauth.c-4.us-east-2.aws.neon.tech/neondb/auth'
 
 describe('auth route', () => {
+  const originalBaseUrl = process.env.NEON_AUTH_BASE_URL
+
   beforeEach(() => {
     handler.GET.mockReset()
     handler.POST.mockReset()
+  })
+
+  afterEach(() => {
+    if (originalBaseUrl === undefined) delete process.env.NEON_AUTH_BASE_URL
+    else process.env.NEON_AUTH_BASE_URL = originalBaseUrl
   })
 
   it('nao entrega rota vulneravel ao handler Neon', async () => {
@@ -72,5 +80,43 @@ describe('auth route', () => {
     expect(response.headers.get('set-cookie')).toMatch(/;\s*Path=\/(?:;|$)/)
     expect(response.headers.get('set-cookie')).toContain('Secure')
     expect(response.headers.get('set-cookie')).toContain('__Secure-neon-auth.session_token=token')
+  })
+
+  /**
+   * Protege: o check de origem do Neon sai de cena quando passamos a origem do backend.
+   * Detecta: rota que aceita POST de outra origem e ainda repassa a chamada.
+   * Impacto: login CSRF — sessao do visitante passa a ser a do atacante.
+   */
+  it('recusa requisicao de outra origem sem chamar o Neon', async () => {
+    const response = await POST(
+      new Request('https://anota-ai-orcin.vercel.app/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: { origin: 'https://malicioso.example', 'content-type': 'application/json' },
+        body: JSON.stringify({ email: 'teste@exemplo.com', password: 'senha-segura' }),
+      }),
+      contextFor(['sign-in', 'email']),
+    )
+
+    expect(response.status).toBe(403)
+    expect(handler.POST).not.toHaveBeenCalled()
+  })
+
+  it('troca a origem do navegador pela origem do backend antes de chamar o Neon', async () => {
+    process.env.NEON_AUTH_BASE_URL = authBaseUrl
+    handler.POST.mockResolvedValue(new Response(null, { status: 204 }))
+
+    const response = await POST(
+      new Request('https://anota-ai-orcin.vercel.app/api/auth/sign-in/email', {
+        method: 'POST',
+        headers: { origin: 'https://anota-ai-orcin.vercel.app', 'content-type': 'application/json' },
+        body: JSON.stringify({ email: 'teste@exemplo.com', password: 'senha-segura' }),
+      }),
+      contextFor(['sign-in', 'email']),
+    )
+
+    expect(response.status).toBe(204)
+    const forwarded = handler.POST.mock.calls[0][0] as Request
+    expect(forwarded.headers.get('origin')).toBe('https://projeto.neonauth.c-4.us-east-2.aws.neon.tech')
+    await expect(forwarded.json()).resolves.toEqual({ email: 'teste@exemplo.com', password: 'senha-segura' })
   })
 })

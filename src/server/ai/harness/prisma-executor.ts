@@ -146,6 +146,13 @@ export function createPrismaExecutionTransaction(transaction: any): HarnessExecu
     },
 
     async createOrigin(input) {
+      // Um projeto reaproveitado entre propostas já tem origem (`@@unique([entityType, entityId])`):
+      // repetir a gravação estouraria P2002 e derrubaria a execução.
+      const existing = await transaction.entityOrigin.findFirst({
+        where: { entityType: input.entityType, entityId: input.entityId },
+        select: { id: true },
+      })
+      if (existing) return
       await transaction.entityOrigin.create({ data: input })
     },
 
@@ -258,6 +265,9 @@ async function createPrismaProposalItem(
   existingReferences: ReadonlyMap<string, HarnessReferenceRecord>,
 ): Promise<MaterializedEntity> {
   if (item.entity === 'PROJECT') {
+    // `@@unique([ownerId, name])`: reaproveitar em vez de estourar P2002 e derrubar a execução inteira.
+    const existing = await transaction.project.findFirst({ where: { ownerId, name: item.data.name }, select: { id: true } })
+    if (existing) return materialized(item, existing.id, existing.id)
     const project = await transaction.project.create({ data: { ownerId, name: item.data.name, description: item.data.description ?? '' } })
     return materialized(item, project.id, project.id)
   }

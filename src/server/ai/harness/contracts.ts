@@ -2,6 +2,9 @@ import { z } from 'zod'
 
 export const HARNESS_PROPOSAL_SCHEMA_VERSION = 1 as const
 
+/** Limite do título do card. O materializador realoca o excedente na descrição antes de validar. */
+export const MAX_TITLE_CHARACTERS = 200
+
 const localIdSchema = z.string().trim().min(1).max(80).regex(/^[a-zA-Z0-9_-]+$/)
 const textSchema = z.string().trim().min(1)
 const dateTimeWithOffsetSchema = z.string().datetime({ offset: true })
@@ -43,7 +46,7 @@ const taskItemSchema = itemBaseSchema.extend({
   entity: z.literal('TASK'),
   data: z.object({
     project: projectRefSchema,
-    title: textSchema.max(200),
+    title: textSchema.max(MAX_TITLE_CHARACTERS),
     description: z.string().max(20_000).optional(),
     moduleName: z.string().trim().max(80).optional(),
     kind: z.enum(['TASK', 'BUG', 'IMPROVEMENT', 'FEATURE', 'DECISION', 'EXTERNAL_REQUEST', 'FUTURE_IDEA', 'QUESTION']).optional(),
@@ -59,7 +62,7 @@ const taskItemSchema = itemBaseSchema.extend({
 
 const meetingDataSchema = z.object({
   project: projectRefSchema.optional(),
-  title: textSchema.max(200),
+  title: textSchema.max(MAX_TITLE_CHARACTERS),
   description: z.string().max(20_000).optional(),
   startsAt: dateTimeWithOffsetSchema,
   endsAt: dateTimeWithOffsetSchema.optional(),
@@ -79,7 +82,7 @@ const noteItemSchema = itemBaseSchema.extend({
   data: z.object({
     project: projectRefSchema,
     task: taskRefSchema.optional(),
-    title: textSchema.max(200),
+    title: textSchema.max(MAX_TITLE_CHARACTERS),
     content: textSchema.max(20_000),
     private: z.literal(true),
   }).strict(),
@@ -124,7 +127,7 @@ const contextItemSchema = itemBaseSchema.extend({
     project: projectRefSchema,
     task: taskRefSchema.optional(),
     category: z.enum(['FACT', 'DECISION', 'RULE', 'VOCABULARY', 'MEETING']),
-    title: textSchema.max(200),
+    title: textSchema.max(MAX_TITLE_CHARACTERS),
     content: textSchema.max(20_000),
   }).strict(),
 }).strict()

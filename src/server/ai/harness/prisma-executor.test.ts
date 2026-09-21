@@ -66,7 +66,7 @@ function prismaFixture() {
     projectContext: { create: create('context'), findFirst: vi.fn() },
     taskDependency: { upsert: vi.fn(async ({ create: data }: any) => { calls.push({ model: 'dependency', data }); return data }) },
     taskMilestone: { upsert: vi.fn(async ({ create: data }: any) => { calls.push({ model: 'taskMilestone', data }); return data }) },
-    entityOrigin: { create: vi.fn(async ({ data }: any) => { origins.push(data); return data }) },
+    entityOrigin: { create: vi.fn(async ({ data }: any) => { origins.push(data); return data }), findFirst: vi.fn(async () => null) },
     auditLog: { create: vi.fn(async ({ data }: any) => { audits.push(data); return data }) },
   }
   const prisma: any = { $transaction: vi.fn(async (callback: any) => callback(tx)) }
@@ -139,5 +139,34 @@ describe('adapter Prisma do executor v2', () => {
 
     await expect(repository.transaction(async () => 'ok')).resolves.toBe('ok')
     expect(fake.prisma.$transaction).toHaveBeenCalledTimes(2)
+  })
+
+  /**
+   * Protege: nome de projeto já existente do owner não derruba a execução.
+   * Detecta: `project.create` estourando P2002 em `@@unique([ownerId, name])`.
+   * Impacto: fluxo repetido falha por colisão de nome e perde a proposta inteira.
+   */
+  it('reaproveita projeto existente com o mesmo nome', async () => {
+    const fake = prismaFixture()
+    const single = { schemaVersion: 1, summary: 'Projeto', items: [base('project-1', 'PROJECT', [], { name: 'Sistema' })], unresolved: [] }
+    fake.tx.proposalRevision.findFirst.mockResolvedValue({
+      id: 'proposal-1', contentHash: hashJson(single), validatedPlan: single, markdownRevision: { id: 'markdown-1', contentHash: 'markdown-hash' },
+      items: [{ id: 'db-item-1', localKey: 'project-1', selected: true }],
+      aiRun: { id: 'run-1', ownerId: 'owner-1', status: 'AWAITING_ENTITY_APPROVAL', version: 7, approvals: fake.approvals },
+    })
+    fake.tx.project.findFirst.mockResolvedValue({ id: 'project-existente' })
+    // Já existe origem para o projeto reaproveitado (`@@unique([entityType, entityId])`).
+    fake.tx.entityOrigin.findFirst.mockImplementation(async ({ where }: { where: Record<string, unknown> }) => (
+      where.proposalItemId ? null : { id: 'origin-existente' }
+    ))
+
+    const result = await executeApprovedHarnessProposal(createPrismaHarnessExecutionRepository(fake.prisma), {
+      ownerId: 'owner-1', aiRunId: 'run-1', proposalRevisionId: 'proposal-1', targetHash: hashJson(single), expectedRunVersion: 7,
+    })
+
+    expect(result).toMatchObject({ kind: 'executed' })
+    expect(fake.calls.some((entry) => entry.model === 'project')).toBe(false)
+    expect(fake.origins).toHaveLength(0)
+    expect(result.entityIds).toContain('project-existente')
   })
 })
