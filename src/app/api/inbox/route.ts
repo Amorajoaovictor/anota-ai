@@ -5,6 +5,7 @@ import { isHarnessEnabledForOwner, readHarnessV2Config } from '../../../server/a
 import { captureInboxText, listInboxItems } from '../../../server/inbox'
 import { PayloadTooLargeError, readJsonBody, ValidationError } from '../../../server/http'
 import { drainJobs } from '../../../server/jobs/runner'
+import { scheduleHarnessJobsDrain } from '../../../server/jobs/harness-drain'
 import { withOwner } from '../../../server/with-owner'
 
 export const dynamic = 'force-dynamic'
@@ -26,7 +27,7 @@ export const POST = withOwner(async ({ ownerId, request }) => {
     })
     if (result.kind === 'invalid') throw new ValidationError('Dados invalidos.', result.issues)
     if (result.kind === 'too-large') throw new PayloadTooLargeError('Texto acima do limite do harness.')
-    triggerInlineDrain()
+    scheduleHarnessJobsDrain(ownerId)
     return NextResponse.json({
       inboxItem: { ...result.inboxItem, aiRuns: [{ id: result.aiRun.id }] },
       aiRun: result.aiRun,

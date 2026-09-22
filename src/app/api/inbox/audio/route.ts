@@ -5,6 +5,7 @@ import { isHarnessEnabledForOwner, readHarnessV2Config } from '../../../../serve
 import { captureInboxAudio } from '../../../../server/inbox'
 import { PayloadTooLargeError, ValidationError } from '../../../../server/http'
 import { drainJobs } from '../../../../server/jobs/runner'
+import { scheduleHarnessJobsDrain } from '../../../../server/jobs/harness-drain'
 import { getMaxUploadBytes, getStorage } from '../../../../server/storage'
 import { withOwner } from '../../../../server/with-owner'
 
@@ -39,7 +40,7 @@ export const POST = withOwner(async ({ ownerId, request }) => {
     if (result.kind === 'too-large') throw new PayloadTooLargeError()
     if (result.kind === 'unsupported-type') throw new ValidationError('Envie um arquivo de audio suportado.')
 
-    drainJobs(getPrisma(), { batchSize: 5 }).catch(() => undefined)
+    scheduleHarnessJobsDrain(ownerId)
     return NextResponse.json({
       inboxItem: { ...result.inboxItem, aiRuns: [{ id: result.aiRun.id }] },
       aiRun: result.aiRun,

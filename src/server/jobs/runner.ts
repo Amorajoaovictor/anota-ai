@@ -26,6 +26,7 @@ export type DrainOptions = {
   jobTimeoutMs?: number
   heartbeatIntervalMs?: number
   leaseMs?: number
+  ownerId?: string
   resolve?: (type: string) => JobHandler
   now?: () => Date
 }
@@ -42,7 +43,7 @@ export async function drainJobs(repository: JobRepository, options: DrainOptions
   const result: DrainResult = { claimed: 0, completed: 0, failed: 0, released: released.count }
 
   for (let processed = 0; processed < batchSize; processed += 1) {
-    const job = await claimNext(repository, workerId, now(), leaseMs)
+    const job = await claimNext(repository, workerId, now(), leaseMs, options.ownerId)
     if (!job) break
     result.claimed += 1
 

@@ -6,6 +6,7 @@ const fakes = vi.hoisted(() => ({
   getHarnessReadModel: vi.fn(),
   createRepository: vi.fn(),
   start: vi.fn(),
+  scheduleHarnessJobsDrain: vi.fn(),
 }))
 
 vi.mock('../../../../../lib/auth/server', () => ({ requireCurrentUserId: fakes.requireCurrentUserId }))
@@ -13,6 +14,7 @@ vi.mock('../../../../../lib/prisma', () => ({ getPrisma: () => ({ prisma: true }
 vi.mock('../../../../../server/ai/harness/read-model', () => ({ getHarnessReadModel: fakes.getHarnessReadModel }))
 vi.mock('../../../../../server/ai/harness/prisma-executor', () => ({ createPrismaHarnessExecutionRepository: fakes.createRepository }))
 vi.mock('../../../../../server/ai/harness/executor', () => ({ startApprovedHarnessProposal: fakes.start }))
+vi.mock('../../../../../server/jobs/harness-drain', () => ({ scheduleHarnessJobsDrain: fakes.scheduleHarnessJobsDrain }))
 
 import { POST } from './route'
 
@@ -26,6 +28,7 @@ describe('POST /api/inbox/[id]/execution', () => {
     fakes.getHarnessReadModel.mockReset().mockResolvedValue({ kind: 'found', harness: { id: 'run-1' } })
     fakes.createRepository.mockReset().mockReturnValue({ repository: true })
     fakes.start.mockReset().mockResolvedValue({ kind: 'started', executionId: 'execution-1', entityIds: [] })
+    fakes.scheduleHarnessJobsDrain.mockReset()
   })
 
   /**
@@ -43,6 +46,7 @@ describe('POST /api/inbox/[id]/execution', () => {
       ownerId: 'owner-1', aiRunId: 'run-1', proposalRevisionId: 'proposal-1', targetHash: 'hash-1',
       selectedItemIds: ['task-1'], expectedRunVersion: 7,
     })
+    expect(fakes.scheduleHarnessJobsDrain).toHaveBeenCalledWith('owner-1')
   })
 
   /**

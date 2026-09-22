@@ -12,6 +12,7 @@ import {
   ValidationError,
 } from '../../../../../server/http'
 import { withOwner } from '../../../../../server/with-owner'
+import { scheduleHarnessJobsDrain } from '../../../../../server/jobs/harness-drain'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -48,6 +49,8 @@ export const POST = withOwner<RouteContext>(async ({ ownerId, request, context }
     }
     throw new ConflictError(result.code)
   }
+
+  scheduleHarnessJobsDrain(ownerId)
 
   return NextResponse.json(
     { executionId: result.executionId, entityIds: result.entityIds ?? [] },

@@ -41,6 +41,25 @@ describe('runner da fila', () => {
     expect(store.jobs[0]!.runAt.getTime()).toBeGreaterThan(now().getTime())
   })
 
+  /**
+   * Protege: executor acionado por uma revisão IA só consome a fila do owner autorizado.
+   * Detecta: um owner consegue executar ou bloquear jobs de outra conta.
+   * Impacto: isolamento de dados e criação indevida de entidades de outro usuário.
+   */
+  it('drena somente jobs do owner informado', async () => {
+    const store = createFakeJobStore([
+      { id: 'job-do-owner', ownerId: 'owner-1', runAt: due },
+      { id: 'job-de-outro-owner', ownerId: 'owner-2', runAt: due },
+    ])
+    const handler = vi.fn().mockResolvedValue(undefined)
+
+    const result = await drainJobs(store, { ownerId: 'owner-1', resolve: () => handler, now })
+
+    expect(result).toMatchObject({ claimed: 1, completed: 1, failed: 0 })
+    expect(store.jobs.find((job) => job.id === 'job-do-owner')?.status).toBe('DONE')
+    expect(store.jobs.find((job) => job.id === 'job-de-outro-owner')?.status).toBe('PENDING')
+  })
+
   it('interrompe a espera pelo handler no timeout e continua o lote', async () => {
     const store = createFakeJobStore([
       { id: 'job-lento', runAt: due },

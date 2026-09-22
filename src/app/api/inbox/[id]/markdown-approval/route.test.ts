@@ -5,12 +5,14 @@ const fakes = vi.hoisted(() => ({
   requireCurrentUserId: vi.fn(),
   getHarnessReadModel: vi.fn(),
   approveMarkdownSnapshot: vi.fn(),
+  scheduleHarnessJobsDrain: vi.fn(),
 }))
 
 vi.mock('../../../../../lib/auth/server', () => ({ requireCurrentUserId: fakes.requireCurrentUserId }))
 vi.mock('../../../../../lib/prisma', () => ({ getPrisma: () => ({}) }))
 vi.mock('../../../../../server/ai/harness/read-model', () => ({ getHarnessReadModel: fakes.getHarnessReadModel }))
 vi.mock('../../../../../server/ai/harness/approvals', () => ({ approveMarkdownSnapshot: fakes.approveMarkdownSnapshot }))
+vi.mock('../../../../../server/jobs/harness-drain', () => ({ scheduleHarnessJobsDrain: fakes.scheduleHarnessJobsDrain }))
 
 import { POST } from './route'
 
@@ -24,6 +26,7 @@ describe('POST /api/inbox/[id]/markdown-approval', () => {
     fakes.approveMarkdownSnapshot.mockReset().mockResolvedValue({
       kind: 'approved', approval: { id: 'approval-1', targetId: 'markdown-2', targetHash: 'hash-2' },
     })
+    fakes.scheduleHarnessJobsDrain.mockReset()
   })
 
   /**
@@ -40,6 +43,7 @@ describe('POST /api/inbox/[id]/markdown-approval', () => {
   it('aprova uma vez e trata repeticao como 200', async () => {
     const body = { revisionId: 'markdown-2', targetHash: 'hash-2', expectedVersion: 4 }
     expect((await POST(jsonRequest(url, body), context())).status).toBe(201)
+    expect(fakes.scheduleHarnessJobsDrain).toHaveBeenCalledWith('owner-1')
 
     fakes.approveMarkdownSnapshot.mockResolvedValueOnce({ kind: 'already-approved', approval: { id: 'approval-1' } })
     expect((await POST(jsonRequest(url, body), context())).status).toBe(200)

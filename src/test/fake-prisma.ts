@@ -85,6 +85,7 @@ export function createFakeJobStore(seed: Partial<JobRecord>[] = []) {
       if (where.id?.notIn && where.id.notIn.includes(job.id)) return false
     }
     if (where.status && job.status !== where.status) return false
+    if (where.ownerId && job.ownerId !== where.ownerId) return false
     if (where.runAt?.lte && job.runAt > where.runAt.lte) return false
     if (where.lockedAt?.lt && !(job.lockedAt && job.lockedAt < where.lockedAt.lt)) return false
     if (where.leaseExpiresAt === null && job.leaseExpiresAt !== null) return false

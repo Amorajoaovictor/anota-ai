@@ -11,6 +11,7 @@ const fakes = vi.hoisted(() => ({
   ownerAllowed: true,
   isHarnessEnabledForOwner: vi.fn(),
   captureHarnessText: vi.fn(),
+  scheduleHarnessJobsDrain: vi.fn(),
   drainJobs: vi.fn().mockResolvedValue({ claimed: 0, completed: 0, failed: 0, released: 0 }),
 }))
 
@@ -34,6 +35,7 @@ vi.mock('../../../server/ai/harness/config', () => ({
   isHarnessEnabledForOwner: fakes.isHarnessEnabledForOwner,
 }))
 vi.mock('../../../server/ai/harness/capture', () => ({ captureHarnessText: fakes.captureHarnessText }))
+vi.mock('../../../server/jobs/harness-drain', () => ({ scheduleHarnessJobsDrain: fakes.scheduleHarnessJobsDrain }))
 
 import { GET, POST } from './route'
 
@@ -56,6 +58,7 @@ describe('rotas da caixa de entrada', () => {
       transcript: { id: 'transcript-1' },
     })
     fakes.drainJobs.mockClear()
+    fakes.scheduleHarnessJobsDrain.mockReset()
   })
 
   it('responde 401 sem sessão', async () => {
@@ -123,6 +126,7 @@ describe('rotas da caixa de entrada', () => {
     expect(fakes.captureHarnessText).toHaveBeenCalledWith(expect.anything(), 'user-1', { text: 'Fluxo novo' }, expect.anything())
     expect(fakes.isHarnessEnabledForOwner).toHaveBeenCalledWith(expect.anything(), 'user-1')
     expect(fakes.jobCreate).not.toHaveBeenCalled()
+    expect(fakes.scheduleHarnessJobsDrain).toHaveBeenCalledWith('user-1')
   })
 
   /**

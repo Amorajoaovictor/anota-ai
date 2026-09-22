@@ -92,6 +92,7 @@ export async function claimNext(
   workerId: string,
   now = new Date(),
   leaseMs = 5 * 60_000,
+  ownerId?: string,
 ): Promise<JobRecord | null> {
   const skip: string[] = []
 
@@ -101,6 +102,7 @@ export async function claimNext(
         status: 'PENDING',
         runAt: { lte: now },
         cancelledAt: null,
+        ...(ownerId ? { ownerId } : {}),
         ...(skip.length ? { id: { notIn: [...skip] } } : {}),
       },
       orderBy: [{ priority: 'desc' }, { runAt: 'asc' }],

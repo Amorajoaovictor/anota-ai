@@ -8,6 +8,7 @@ import { withOwner } from '../../../../../server/with-owner'
 import { readHarnessV2Config } from '../../../../../server/ai/harness/config'
 import { assessHarnessInput } from '../../../../../server/ai/harness/budget'
 import { UnprocessableEntityError } from '../../../../../server/http'
+import { scheduleHarnessJobsDrain } from '../../../../../server/jobs/harness-drain'
 
 type RouteContext = { params: Promise<{ id: string }> }
 
@@ -49,5 +50,6 @@ export const POST = withOwner<RouteContext>(async ({ ownerId, request, context }
   if (result.kind === 'stale-version' || result.kind === 'hash-mismatch' || result.kind === 'invalid-state') {
     throw new ConflictError(result.kind === 'stale-version' ? 'STALE_VERSION' : 'APPROVAL_MISMATCH')
   }
+  scheduleHarnessJobsDrain(ownerId)
   return NextResponse.json({ approval: result.approval }, { status: result.kind === 'approved' ? 201 : 200 })
 })
