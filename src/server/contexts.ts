@@ -43,10 +43,11 @@ type ContextUpdateRepository = {
   }
 }
 
-export async function listContexts(repository: ContextListRepository, ownerId: string) {
+export async function listContexts(repository: ContextListRepository, ownerId: string, page?: { take: number; skip: number }) {
   return repository.projectContext.findMany({
     where: { project: { ownerId } },
     orderBy: { createdAt: 'desc' },
+    ...page,
   })
 }
 

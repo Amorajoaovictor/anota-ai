@@ -42,6 +42,13 @@ export function Modal({
     document.body.style.overflow = 'hidden'
     surface.current?.querySelector<HTMLElement>(focusableSelector)?.focus()
 
+    return () => {
+      document.body.style.overflow = overflow
+      previous?.focus?.()
+    }
+  }, [])
+
+  useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key === 'Escape') return onClose()
       if (event.key !== 'Tab' || !surface.current) return
@@ -56,8 +63,6 @@ export function Modal({
     document.addEventListener('keydown', onKeyDown)
     return () => {
       document.removeEventListener('keydown', onKeyDown)
-      document.body.style.overflow = overflow
-      previous?.focus?.()
     }
   }, [onClose])
 

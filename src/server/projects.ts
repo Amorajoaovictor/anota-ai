@@ -59,11 +59,12 @@ type ProjectUpdateRepository = {
   }
 }
 
-export async function listProjects(repository: ProjectListRepository, ownerId: string) {
+export async function listProjects(repository: ProjectListRepository, ownerId: string, page?: { take: number; skip: number }) {
   return repository.project.findMany({
     where: { ownerId },
     orderBy: { updatedAt: 'desc' },
     include: projectInclude,
+    ...page,
   })
 }
 

@@ -85,11 +85,12 @@ type TaskHistoryRepository = {
   auditLog: { findMany(args: any): Promise<unknown> }
 }
 
-export async function listTasks(repository: TaskListRepository, ownerId: string) {
+export async function listTasks(repository: TaskListRepository, ownerId: string, page?: { take: number; skip: number }) {
   return repository.task.findMany({
     where: { project: { ownerId } },
     orderBy: { updatedAt: 'desc' },
     include: taskInclude,
+    ...page,
   })
 }
 

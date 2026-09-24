@@ -611,3 +611,16 @@ model AuditLog {
   @@index([entityType, entityId])
   @@index([actorId, createdAt])
 }
+
+model McpToken {
+  id        String    @id @default(cuid())
+  ownerId   String
+  name      String
+  tokenHash String    @unique
+  scopes    String[]
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([ownerId, createdAt])
+}

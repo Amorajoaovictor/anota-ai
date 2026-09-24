@@ -65,11 +65,12 @@ type InboxConfirmRepository = Omit<TaskCreateRepository, 'inboxItem' | 'projectT
   }
 }
 
-export function listInboxItems(repository: InboxListRepository, ownerId: string) {
+export function listInboxItems(repository: InboxListRepository, ownerId: string, page?: { take: number; skip: number }) {
   return repository.inboxItem.findMany({
     where: { ownerId },
     orderBy: { createdAt: 'desc' },
     include: { aiRuns: { select: { id: true, status: true }, orderBy: { createdAt: 'desc' }, take: 1 } },
+    ...page,
   })
 }
 
@@ -81,12 +82,13 @@ export async function captureInboxText(
   repository: InboxCaptureRepository,
   ownerId: string,
   input: unknown,
+  source: 'TEXT' | 'MCP' = 'TEXT',
 ): Promise<CaptureInboxResult> {
   const parsed = inboxCaptureSchema.safeParse(input)
   if (!parsed.success) return { kind: 'invalid', issues: parsed.error.issues.map((issue) => issue.message) }
 
   const inboxItem = await repository.inboxItem.create({
-    data: { ownerId, source: 'TEXT', status: 'RECEIVED', text: parsed.data.text },
+    data: { ownerId, source, status: 'RECEIVED', text: parsed.data.text },
   })
   await enqueue(repository, { type: 'ai.classify', payload: { inboxItemId: inboxItem.id } })
   return { kind: 'created', inboxItem }

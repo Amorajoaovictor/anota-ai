@@ -40,6 +40,14 @@ describe('caixa de entrada persistida', () => {
     expect(store.jobs).toMatchObject([{ type: 'ai.classify', payload: { inboxItemId: 'inbox-1' } }])
   })
 
+  it('marca entrada criada por cliente MCP sem mudar classificação', async () => {
+    const store = createFakeJobStore()
+    const create = vi.fn().mockResolvedValue({ id: 'inbox-mcp' })
+    await captureInboxText({ ...store, inboxItem: { create } }, 'user-1', { text: 'Nova demanda' }, 'MCP')
+    expect(create).toHaveBeenCalledWith({ data: { ownerId: 'user-1', source: 'MCP', status: 'RECEIVED', text: 'Nova demanda' } })
+    expect(store.jobs).toMatchObject([{ type: 'ai.classify', payload: { inboxItemId: 'inbox-mcp' } }])
+  })
+
   it('recusa texto vazio sem tocar no banco', async () => {
     const store = createFakeJobStore()
     const create = vi.fn()
