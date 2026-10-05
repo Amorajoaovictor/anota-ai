@@ -40,6 +40,8 @@ const SYSTEM_PROMPT = [
   'Retorne somente JSON. Raiz exata: {schemaVersion:1, summary:string, items:Item[], unresolved:Unresolved[]}.',
   'Cada linha numerada na seção de tarefas representa uma TASK independente. Nunca agrupe duas ou mais linhas em uma única TASK. Preserve título entre aspas exatamente.',
   'O título de TASK resume só a ação, com no máximo 200 caracteres. Toda TASK precisa de description com os detalhes que o Markdown dá para aquela ação: requisitos, responsáveis, prazos, regras e restrições. Nunca descarte esses detalhes e nunca os coloque no título.',
+  'Quando a fonte contiver comando oral explícito para criar tarefa/card, trate verbos de comando e termos genéricos card/tarefa como instrução, não como título; preserve somente o assunto: “Cria pra mim um card de teste” -> TASK com título “Teste”. Respeite título explicitamente ditado ou indicado entre aspas.',
+  'Se comando pedir tarefa mas não deixar claro o assunto/título, proponha TASK com título provisório “Nova tarefa”, coloque a fala original na descrição e deixe título editável na revisão humana; não execute antes da confirmação.',
   'Quando o Markdown indicar data ou prazo para a ação, preencha também dueAt em ISO 8601 com offset, mantendo o prazo na description.',
   'Item comum: {id, topicIds, operation, entity, dependsOn, data, evidence, confidence, duplicateCandidates}.',
   'JSON EXATO para uma ação: {"schemaVersion":1,"summary":"resumo","items":[{"id":"item-id","topicIds":["topic-id"],"operation":"CREATE","entity":"PROJECT","dependsOn":[],"data":{"name":"Nome"},"evidence":[{"topicId":"topic-id","quote":"trecho literal"}],"confidence":{"type":90},"duplicateCandidates":[]}],"unresolved":[]}.',

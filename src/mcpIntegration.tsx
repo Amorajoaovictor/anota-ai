@@ -2,6 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from 'react'
 import { Button, type Notify } from './ui'
+import './mcpIntegration.css'
 
 type Token = { id: string; name: string; scopes: string[]; expiresAt?: string; revokedAt?: string | null }
 const availableScopes = [
@@ -68,28 +69,30 @@ export function McpIntegration({ notify }: { notify: Notify }) {
     }
   }
 
-  return <section className="view-panel integration-card">
+  return <section className="view-panel integration-card mcp-integration">
     <strong>MCP</strong>
     <span>Conecte agentes ao Anota Aí com permissões por conexão. O agente deve pedir sua confirmação antes de gravar.</span>
-    <form onSubmit={createToken}>
-      <label htmlFor="mcp-token-name">Nome da conexão</label>
-      <input id="mcp-token-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
-      <fieldset>
+    <form className="mcp-form" onSubmit={createToken}>
+      <div className="mcp-name-field">
+        <label htmlFor="mcp-token-name">Nome da conexão</label>
+        <input id="mcp-token-name" value={name} onChange={(event) => setName(event.target.value)} maxLength={80} />
+      </div>
+      <fieldset className="mcp-permissions">
         <legend>Permissões</legend>
-        {availableScopes.map((scope) => <label key={scope.value}>
+        {availableScopes.map((scope) => <label className="mcp-permission" key={scope.value}>
           <input type="checkbox" checked={scopes.includes(scope.value)} onChange={() => toggleScope(scope.value)} />
-          {scope.label}
+          <span>{scope.label}</span>
         </label>)}
       </fieldset>
       <Button type="submit" variant="primary" disabled={busy || !name.trim() || !scopes.length}>Criar token</Button>
     </form>
-    {issued && <div>
+    {issued && <div className="mcp-issued">
       <strong>Copie agora. Este token aparece só uma vez.</strong>
-      <code>{issued.value}</code>
+      <code className="mcp-token-value">{issued.value}</code>
       <span>URL remota: {typeof window !== 'undefined' ? `${window.location.origin}/api/mcp` : '/api/mcp'}</span>
       <span>Local: defina ANOTA_MCP_TOKEN e configure o agente para executar node --env-file=.env.local --import tsx src/server/mcp/stdio.ts neste projeto.</span>
     </div>}
-    {tokens.filter((token) => !token.revokedAt).map((token) => <div key={token.id}>
+    {tokens.filter((token) => !token.revokedAt).map((token) => <div className="mcp-connection" key={token.id}>
       <span>{token.name} ({token.scopes.join(', ')})</span>
       <Button variant="danger" size="sm" disabled={busy} onClick={() => revokeToken(token)}>Revogar {token.name}</Button>
     </div>)}

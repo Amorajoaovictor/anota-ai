@@ -91,3 +91,40 @@ function parseIsoDate(value: string): Date | null {
   const date = new Date(year, month - 1, day)
   return Number.isNaN(date.getTime()) ? null : date
 }
+
+export type RoadmapScale = 'days' | 'weeks'
+export type RoadmapColumn = RoadmapDay & { endKey: string; endDate: Date }
+
+export function shiftRoadmapDate(date: Date, days: number): Date {
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate() + days)
+}
+
+/** Calendar arithmetic (not milliseconds) keeps local dates stable across DST. */
+export function buildRoadmapTimeline(anchor: Date, scale: RoadmapScale, count: number, today = new Date()): RoadmapColumn[] {
+  const start = scale === 'weeks' ? buildRoadmapWeek(anchor, today)[0].date : anchor
+  const step = scale === 'weeks' ? 7 : 1
+  return Array.from({ length: count }, (_, index) => {
+    const date = shiftRoadmapDate(start, index * step)
+    const endDate = shiftRoadmapDate(date, step - 1)
+    const key = dateKey(date)
+    const endKey = dateKey(endDate)
+    return { date, endDate, key, endKey, day: date.getDate(), month: months[date.getMonth()], weekday: weekdays[date.getDay()], isToday: dateKey(today) >= key && dateKey(today) <= endKey }
+  })
+}
+
+function dateKey(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+export function groupRoadmapTimeline(tasks: Task[], milestones: Milestone[], columns: RoadmapColumn[]) {
+  const grouped = columns.map(column => ({ ...column, tasks: [] as Task[], milestones: [] as Milestone[] }))
+  // One index per day. Bounded rendered window, regardless of historical span.
+  const byDay = new Map<string, typeof grouped[number]>()
+  grouped.forEach(column => {
+    for (let date = column.date; date <= column.endDate; date = shiftRoadmapDate(date, 1)) byDay.set(dateKey(date), column)
+  })
+  tasks.forEach(task => { if (task.due) byDay.get(task.due)?.tasks.push(task) })
+  milestones.forEach(milestone => byDay.get(milestone.targetDate)?.milestones.push(milestone))
+  grouped.forEach(column => column.tasks.sort((a, b) => priorities.indexOf(a.priority) - priorities.indexOf(b.priority) || a.title.localeCompare(b.title)))
+  return { columns: grouped, unscheduled: tasks.filter(task => !task.due) }
+}

@@ -275,7 +275,7 @@ async function handleAiMaterialize(job: JobRecord, context?: JobHandlerContext) 
     await processMaterializationJob(getPrisma(), job, buildMaterializationProvider(environment), {
       now: new Date().toISOString(),
       timezone: 'America/Sao_Paulo',
-      promptVersion: 'materializer-v1',
+      promptVersion: 'materializer-v2',
       signal: context.signal,
       budget: config.materializerBudget,
       providerName,

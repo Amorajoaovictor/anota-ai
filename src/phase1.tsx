@@ -20,7 +20,7 @@ import { RoadmapView } from './roadmapView'
 import { SpreadsheetView } from './spreadsheet'
 import { TaskDetail } from './taskDetail'
 import type { TaskCreateDefaults } from './taskCreate'
-import { EmptyState, Button, type Notify } from './ui'
+import { EmptyState, Button, PageHeading, type Notify } from './ui'
 
 export type Phase1Section = 'Projetos' | 'Planilha' | 'Kanban' | 'Marcos' | 'Reuniões' | 'Roadmap' | 'Prazos' | 'Calendário' | 'Notas' | 'Caixa de entrada' | 'Revisão IA' | 'Integrações'
 
@@ -60,7 +60,7 @@ export function Phase1View({ section, scope, state, setState, actions, notify, o
     if (section === 'Kanban') return <KanbanView state={state} scope={scope} actions={actions} onOpen={openTask} onStatusChange={changeStatus} onCreateTask={onCreateTask} />
     if (section === 'Marcos') return <MilestonesView state={state} scope={scope} setState={setState} actions={actions} notify={notify} onOpenTask={openTask} />
     if (section === 'Reuniões') return <MeetingsView state={state} scope={scope} actions={actions} />
-    if (section === 'Roadmap') return <><Heading level="section" title="Roadmap" icon={<MapTrifold size={34} />} /><RoadmapView state={state} scope={scope} actions={actions} notify={notify} onOpen={openTask} onCreateTask={onCreateTask} /></>
+    if (section === 'Roadmap') return <><PageHeading className="roadmap-heading" title="Roadmap" subtitle="Arraste para explorar suas tarefas no tempo." /><RoadmapView state={state} scope={scope} actions={actions} notify={notify} onOpen={openTask} onCreateTask={onCreateTask} /></>
     if (section === 'Prazos') return <DeadlinesView state={state} scope={scope} onOpen={openTask} onCreateTask={onCreateTask} />
     if (section === 'Calendário') return <CalendarView state={state} scope={scope} onOpenTask={openTask} />
     if (section === 'Notas') return <NotesView state={state} scope={scope} actions={actions} notify={notify} />

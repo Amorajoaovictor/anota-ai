@@ -1,13 +1,15 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Archive, ArrowLeft, Bell, CalendarBlank, Check, DotsSixVertical, Flag, Gear, House, Kanban as KanbanIcon, ListChecks, MapTrifold, MagnifyingGlass, NotePencil, Plus, ProjectorScreenChart, Sparkle, Table, Tray } from '@phosphor-icons/react'
+import { Archive, ArrowLeft, ArrowRight, CalendarBlank, Check, DotsSixVertical, DotsThree, Flag, Gear, House, Kanban as KanbanIcon, ListChecks, MapTrifold, MagnifyingGlass, NotePencil, Plus, ProjectorScreenChart, Sparkle, Table, Tray } from '@phosphor-icons/react'
 import { dragHandleProps, reorderKeyProps, useDropZone, type DragItem } from './dnd'
-import { addInboxItem, globalScope, projectScope, reorderActionPlan, sortActionPlanByPriority, type AppState, type Scope, type SearchHit, type Task } from './domain'
+import { globalScope, projectScope, reorderActionPlan, sortActionPlanByPriority, type AppState, type Scope, type SearchHit, type Task } from './domain'
 import type { CurrentUser } from './lib/auth/server'
 import { useProjectData, type ProjectActions } from './lib/store'
 import { Phase1View, projectSections, type Phase1Section, type ProjectSection } from './phase1'
 import { TaskCreateDialog, type TaskCreateDefaults, type TaskCreateInput } from './taskCreate'
+import { TodayCapture } from './todayCapture'
+import { NotificationBell } from './notificationBell'
 import { SignOutButton } from './app/SignOutButton'
 import { Button, CommandPalette, EmptyState, Toast, useToast, type CommandAction, type Notify, type PaletteResult } from './ui'
 
@@ -55,6 +57,7 @@ export default function App({ initialState, user }: { initialState: AppState; us
   const [createDraft, setCreateDraft] = useState<TaskCreateDefaults | null>(null)
   const [openTaskId, setOpenTaskId] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
+  const [mobileMoreOpen, setMobileMoreOpen] = useState(false)
   const activeTasks = useMemo(() => state.actionPlan.filter((task) => task.status !== 'Concluída'), [state.actionPlan])
   const pendingReviewCount = useMemo(() => state.inbox.filter((item) => item.status === 'Aguardando confirmação').length, [state.inbox])
   const scope: Scope = route.kind === 'project' ? projectScope(route.projectId) : globalScope
@@ -91,10 +94,12 @@ export default function App({ initialState, user }: { initialState: AppState; us
   }
 
   function goGlobal(section: Section) {
+    setMobileMoreOpen(false)
     setRoute({ kind: 'global', section })
   }
 
   function goProject(projectId: string, section: ProjectSection = 'Visão geral') {
+    setMobileMoreOpen(false)
     setRoute({ kind: 'project', projectId, section })
   }
 
@@ -145,11 +150,13 @@ export default function App({ initialState, user }: { initialState: AppState; us
 
     <main className="main-content">
       <header className="topbar">
-        <div className="mobile-brand"><ProjectorScreenChart size={22} weight="duotone" /> Central</div>
+        <div className="mobile-brand"><ProjectorScreenChart size={22} weight="duotone" /> Central de Projetos</div>
         <button className="search" onClick={() => setPaletteOpen(true)}><MagnifyingGlass size={18} /><span>Buscar tarefas, projetos...</span><kbd>⌘ K</kbd></button>
         <div className="top-actions">
           <button className="topbar-create" onClick={() => openTaskCreate()} title="Nova tarefa (N)"><Plus size={18} weight="bold" /><span>Nova tarefa</span></button>
-          <button aria-label={`Notificações${pendingReviewCount ? `, ${pendingReviewCount} pendentes` : ''}`} onClick={() => goGlobal('Caixa de entrada')}><Bell size={20} />{pendingReviewCount > 0 && <b>{pendingReviewCount}</b>}</button>
+          <NotificationBell tasks={state.tasks} meetings={state.meetings} pendingReviewCount={pendingReviewCount}
+            onOpenTask={(task) => { goGlobal('Kanban'); setOpenTaskId(task.id) }}
+            onOpenMeetings={() => goGlobal('Reuniões')} onOpenInbox={() => goGlobal('Caixa de entrada')} />
           <button aria-label="Configurações" onClick={() => goGlobal('Integrações')}><Gear size={20} /></button>
           <SignOutButton />
         </div>
@@ -168,6 +175,16 @@ export default function App({ initialState, user }: { initialState: AppState; us
 
       {renderMain()}
     </main>
+
+    <nav className="mobile-bottom-nav" aria-label="Navegação principal">
+      <button aria-current={route.kind === 'global' && route.section === 'Hoje' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Hoje' ? 'active' : ''} onClick={() => goGlobal('Hoje')}><House size={21} /><span>Hoje</span></button>
+      <button aria-current={route.kind === 'global' && route.section === 'Projetos' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Projetos' ? 'active' : ''} onClick={() => goGlobal('Projetos')}><Archive size={21} /><span>Projetos</span></button>
+      <button aria-current={route.kind === 'global' && route.section === 'Kanban' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Kanban' ? 'active' : ''} onClick={() => goGlobal('Kanban')}><KanbanIcon size={21} /><span>Tarefas</span></button>
+      <button aria-expanded={mobileMoreOpen} className={mobileMoreOpen || (route.kind === 'project' || !['Hoje', 'Projetos', 'Kanban'].includes(route.section)) ? 'active' : ''} onClick={() => setMobileMoreOpen((open) => !open)}><DotsThree size={22} /><span>Mais</span></button>
+    </nav>
+    {mobileMoreOpen && <nav id="mobile-more-menu" className="mobile-more-menu" aria-label="Mais seções">
+      {nav.filter((item) => !['Hoje', 'Projetos', 'Kanban', 'Caixa de entrada'].includes(item.label)).map(({ label, icon: Icon }) => <button key={label} onClick={() => goGlobal(label)}><Icon size={19} /><span>{label}</span></button>)}
+    </nav>}
 
     {createDraft && <TaskCreateDialog
       state={state}
@@ -194,26 +211,14 @@ export default function App({ initialState, user }: { initialState: AppState; us
       openTaskId, onOpenTask: (task: Task) => setOpenTaskId(task.id), onCloseTask: () => setOpenTaskId(null),
     }
     if (route.kind === 'project') return <Phase1View section={route.section} {...shared} />
-    if (route.section === 'Hoje') return <Today state={state} setState={setState} actions={actions} activeTasks={activeTasks} notify={notify} onCreateTask={openTaskCreate} />
+    if (route.section === 'Hoje') return <Today state={state} setState={setState} actions={actions} activeTasks={activeTasks} notify={notify} onCreateTask={openTaskCreate} onOpenInbox={() => goGlobal('Caixa de entrada')} />
     return <Phase1View section={route.section} {...shared} />
   }
 }
 
-function Today({ state, setState, actions, activeTasks, notify, onCreateTask }: { state: AppState; setState: (state: AppState) => void; actions: ProjectActions; activeTasks: Task[]; notify: Notify; onCreateTask: (defaults?: TaskCreateDefaults) => void }) {
-  const [inboxText, setInboxText] = useState('')
-  const [showCapture, setShowCapture] = useState(false)
-
+function Today({ state, setState, actions, activeTasks, notify, onCreateTask, onOpenInbox }: { state: AppState; setState: (state: AppState) => void; actions: ProjectActions; activeTasks: Task[]; notify: Notify; onCreateTask: (defaults?: TaskCreateDefaults) => void; onOpenInbox: () => void }) {
   function finish(task: Task) {
     void actions.completeTask(task.id)
-  }
-
-  function capture() {
-    const next = addInboxItem(state, inboxText)
-    if (next === state) return
-    setState(next)
-    setInboxText('')
-    setShowCapture(false)
-    notify('Entrada adicionada à caixa de entrada — vale só nesta sessão', 'info')
   }
 
   function reorder(item: DragItem, beforeTaskId?: string) {
@@ -233,42 +238,57 @@ function Today({ state, setState, actions, activeTasks, notify, onCreateTask }: 
     ? { title: activeTasks[0]!.title, detail: `${activeTasks.length} em aberto · ${withDue} com prazo` }
     : { title: 'Plano vazio', detail: 'Adicione uma tarefa ao plano de ação.' }
 
+  const pendingAiEntries = state.inbox.filter((item) => item.status !== 'Processada' && item.status !== 'Descartada').slice(0, 3)
+
   return <>
-    <div className="page-heading">
-      <div><h1>Hoje</h1></div>
-      <div className="focus-note"><Sparkle size={20} /><div><strong>Foco do dia</strong><span>{focusCopy.title} — {focusCopy.detail}</span></div></div>
+    <div className="today-desktop">
+      <div className="page-heading">
+        <div><h1>Hoje</h1></div>
+        <div className="focus-note"><Sparkle size={20} /><div><strong>Foco do dia</strong><span>{focusCopy.title} — {focusCopy.detail}</span></div></div>
+      </div>
+
+      <div className="today-grid">
+        <section className="plan-panel">
+          <div className="panel-title">
+            <h2><ListChecks size={22} weight="duotone" /> Plano de ação</h2>
+            <Button trailing={<Sparkle size={16} />} onClick={recalculate}>Recalcular</Button>
+          </div>
+          <PlanTimeline tasks={activeTasks} onReorder={reorder} onFinish={finish} onAdd={() => onCreateTask()} />
+        </section>
+
+        <aside className="right-column">
+          <section className="side-panel">
+            <div className="side-title"><h2><CalendarBlank size={21} /> Próximos prazos</h2><button onClick={() => notify('Central de prazos aberta')}>Ver todos</button></div>
+            {state.tasks.filter((task) => task.due && task.status !== 'Concluída').slice(0, 4).map((task) => <div className="deadline" key={task.id}>
+              <i style={{ background: task.color }} />
+              <div><strong>{task.title}</strong><small>{task.project}</small></div>
+              <div className="deadline-date"><strong>{task.due}</strong></div>
+            </div>)}
+          </section>
+
+          <section className="today-desktop-capture"><TodayCapture projects={state.projects} onCaptureTask={actions.captureInbox} onSaveNote={(input) => actions.createNote({ title: '', ...input })} /></section>
+        </aside>
+      </div>
     </div>
 
-    <div className="today-grid">
-      <section className="plan-panel">
-        <div className="panel-title">
-          <h2><ListChecks size={22} weight="duotone" /> Plano de ação</h2>
-          <Button trailing={<Sparkle size={16} />} onClick={recalculate}>Recalcular</Button>
-        </div>
-        <PlanTimeline tasks={activeTasks} onReorder={reorder} onFinish={finish} onAdd={() => onCreateTask()} />
+    <div className="mobile-today">
+      <header className="mobile-today-heading"><p>PLANEJAMENTO</p><h1>Hoje</h1></header>
+      <TodayCapture projects={state.projects} onCaptureTask={actions.captureInbox} onSaveNote={(input) => actions.createNote({ title: '', ...input })} />
+
+      <section className="mobile-today-section" aria-labelledby="mobile-next-action-title">
+        <div className="mobile-today-section-heading"><h2 id="mobile-next-action-title">Próxima ação</h2><span>{activeTasks.length} em aberto</span></div>
+        {activeTasks[0] ? <article className="mobile-next-action">
+          <div><small>{activeTasks[0].project}</small><h3>{activeTasks[0].title}</h3><p>{activeTasks[0].due || 'Sem prazo'} · {activeTasks[0].priority}</p></div>
+          <button aria-label={`Concluir ${activeTasks[0].title}`} onClick={() => finish(activeTasks[0]!)}><Check size={20} /></button>
+        </article> : <p className="mobile-today-empty">Seu plano está livre. Capture uma tarefa para começar.</p>}
       </section>
 
-      <aside className="right-column">
-        <section className="side-panel">
-          <div className="side-title"><h2><CalendarBlank size={21} /> Próximos prazos</h2><button onClick={() => notify('Central de prazos aberta')}>Ver todos</button></div>
-          {state.tasks.filter((task) => task.due && task.status !== 'Concluída').slice(0, 4).map((task) => <div className="deadline" key={task.id}>
-            <i style={{ background: task.color }} />
-            <div><strong>{task.title}</strong><small>{task.project}</small></div>
-            <div className="deadline-date"><strong>{task.due}</strong></div>
-          </div>)}
-        </section>
-
-        <section className="side-panel inbox-panel">
-          <div className="side-title"><h2><Tray size={21} /> Caixa de entrada</h2><span>{state.inbox.length}</span></div>
-          {showCapture
-            ? <div className="capture-form">
-              <textarea autoFocus value={inboxText} onChange={(event) => setInboxText(event.target.value)} placeholder="Qualquer ideia, tarefa ou informação rápida..." />
-              <div><Button onClick={() => { setShowCapture(false); setInboxText('') }}>Cancelar</Button><Button variant="primary" disabled={!inboxText.trim()} onClick={capture}>Salvar captura</Button></div>
-            </div>
-            : <button className="capture-trigger" onClick={() => setShowCapture(true)}>Nova captura <Plus size={17} /></button>}
-          {state.inbox.slice(0, 2).map((item) => <div className="inbox-items" key={item.id}><p>{item.text}</p><small>{item.date} · {item.status}</small></div>)}
-        </section>
-      </aside>
+      <section className="mobile-today-section mobile-ai-section" aria-labelledby="mobile-ai-title">
+        <div className="mobile-today-section-heading"><h2 id="mobile-ai-title"><Sparkle size={18} /> Caixa de entrada</h2><button onClick={onOpenInbox}>Abrir caixa <ArrowRight size={15} /></button></div>
+        {pendingAiEntries.length ? <div className="mobile-ai-list">{pendingAiEntries.map((item) => <article key={item.id}>
+          <p>{item.text}</p><small>{item.date} · {item.status}</small>
+        </article>)}</div> : <p className="mobile-today-empty">Novas tarefas e reuniões capturadas aparecem aqui para revisão.</p>}
+      </section>
     </div>
   </>
 }

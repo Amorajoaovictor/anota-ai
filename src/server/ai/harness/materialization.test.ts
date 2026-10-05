@@ -577,3 +577,21 @@ describe('Fase 6 — materialização strict', () => {
     expect(result.proposal.unresolved).toEqual([expect.objectContaining({ topicId: 'topic-b', evidence: [{ quote: 'B' }] })])
   })
 })
+
+describe('comando de voz em título de tarefa', () => {
+  /**
+   * Protege: frase operacional de criação não vira título do card.
+   * Detecta: regressão reproduzida por “Cria pra mim um card de teste”, que gerava “Criar card de teste”.
+   * Impacto: card fica com comando ditado em vez do assunto e exige correção manual.
+   */
+  it('instrui materializador a manter apenas assunto ditado no título', () => {
+    const request = buildMaterializationRequest({
+      approvedMarkdown: 'Cria pra mim um card de teste', approvedMarkdownHash: 'voice-hash', retrievalSnapshot: references,
+      now: '2026-07-31T12:00:00-03:00', timezone: 'America/Sao_Paulo', topics: [{ id: 'topic-meeting' }],
+    })
+
+    expect(request.system).toContain('“Cria pra mim um card de teste” -> TASK com título “Teste”')
+    expect(request.system).toContain('título provisório “Nova tarefa”')
+    expect(request.system).toContain('deixe título editável na revisão humana')
+  })
+})

@@ -74,7 +74,7 @@ describe('pipeline real das etapas retrieval/materialize', () => {
     expect(provider.retrieve).toHaveBeenCalledWith(expect.objectContaining({ ownerId: 'owner-1', topics: [{ id: 'topic-1', text: '## Tarefa\nCriar prototipo.' }] }))
     expect(fake.retrievals[0]).toMatchObject({ aiRunId: 'run-1', markdownRevisionId: 'markdown-1', queryVersion: 'retrieval-v1' })
     expect(fake.run).toMatchObject({ status: 'MATERIALIZING', version: 6 })
-    expect(fake.jobs[0]).toMatchObject({ type: 'ai.materialize', inputVersion: 6, inputHash: fake.retrievals[0].contentHash })
+    expect(fake.jobs[0]).toMatchObject({ type: 'ai.materialize', inputVersion: 6, inputHash: fake.retrievals[0].contentHash, dedupeKey: expect.stringContaining('materializer-v2') })
   })
 
   /**

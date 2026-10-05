@@ -64,7 +64,7 @@ export async function processRetrievalJob(
         inputHash: snapshot.contentHash,
         priority: job.priority,
         timeoutMs: options.materializationTimeoutMs ?? 90_000,
-        dedupeKey: `materialize:${job.aiRunId}:${markdown.contentHash}:${snapshot.contentHash}:materializer-v1:configured`,
+        dedupeKey: `materialize:${job.aiRunId}:${markdown.contentHash}:${snapshot.contentHash}:materializer-v2:configured`,
       })
       return snapshot
     },
