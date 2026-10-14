@@ -15,6 +15,9 @@ const fields = z.record(z.string(), z.unknown())
 const paging = { limit: z.number().int().min(1).max(100).optional(), offset: z.number().int().min(0).max(100_000).optional() }
 
 const definitions = [
+  { name: 'meetings.list', scope: 'read', description: 'Lista reuniões do dono do token.', schema: z.object({}) },
+  { name: 'meetings.create', scope: 'create', description: 'Cria reunião local após confirmar título, início, fim ou duração e fuso. Para reunião online, depois chame meetings.schedule com o ID retornado.', schema: z.object({ meeting: fields, ...confirm }) },
+  { name: 'meetings.schedule', scope: 'create', description: 'Agenda reunião existente no Google Calendar e gera Google Meet. Exige conexão Google e confirmação do usuário. Repetir com mesmo ID não duplica evento; se conferenceStatus=pending repita esta ferramenta. Não cria convites para terceiros.', schema: z.object({ id, ...confirm }) },
   { name: 'projects.list', scope: 'read', description: 'Lista projetos do usuário em páginas de até 100.', schema: z.object(paging) },
   { name: 'projects.get', scope: 'read', description: 'Consulta projeto pelo ID.', schema: z.object({ id }) },
   { name: 'projects.create', scope: 'create', description: 'Cria projeto após confirmação do usuário.', schema: z.object({ name: z.string().min(1), description: z.string().optional(), color: z.string().optional(), priority: z.enum(['P0', 'P1', 'P2', 'P3']).optional(), ...confirm }) },
@@ -49,9 +52,9 @@ export function createAnotaMcpServer(identity: McpIdentity) {
       try {
         if (!identity.scopes.includes(definition.scope)) throw new Error('INSUFFICIENT_SCOPE')
         const prisma = getPrisma()
-        const { result, rejected } = await prisma.$transaction(async (transaction) => {
+        const execute = async (transaction: typeof prisma) => {
           const value = await callMcpTool(definition.name, args as Record<string, unknown>, {
-            ownerId: identity.ownerId, repository: transaction as never,
+            ownerId: identity.ownerId, repository: transaction as never, requestId,
           })
           const rejected = isDomainFailure(value)
           await transaction.auditLog.create({ data: {
@@ -68,7 +71,10 @@ export function createAnotaMcpServer(identity: McpIdentity) {
             },
           } })
           return { result: value, rejected }
-        })
+        }
+        const { result, rejected } = definition.name === 'meetings.schedule'
+          ? await execute(prisma)
+          : await prisma.$transaction(async (transaction) => execute(transaction as unknown as typeof prisma))
         return { isError: rejected, content: [{ type: 'text' as const, text: JSON.stringify({ requestId, result }) }] }
       } catch (error) {
         const code = publicErrorCode(error)

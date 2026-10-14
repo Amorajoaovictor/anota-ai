@@ -5,8 +5,11 @@ import { createContext, listContexts, removeContext, updateContext } from '../co
 import { captureInboxText, confirmInboxItem, discardInboxItem, listInboxItems } from '../inbox'
 import { createProject, listProjects, updateProject } from '../projects'
 import { createTask, listTasks, updateTask } from '../tasks'
+import { createMeeting, listMeetings } from '../meetings'
+import { scheduleGoogleMeeting } from '../google-meetings'
+import { randomUUID } from 'node:crypto'
 
-export type McpCaller = { ownerId: string; repository: PrismaClient }
+export type McpCaller = { ownerId: string; repository: PrismaClient; requestId?: string }
 
 const idInput = z.object({ id: z.string().trim().min(1) })
 const searchInput = z.object({ query: z.string().trim().min(1).max(200) })
@@ -32,6 +35,16 @@ function objectInput(args: Record<string, unknown>, key: string) {
 export async function callMcpTool(name: string, args: Record<string, unknown>, caller: McpCaller) {
   const { repository, ownerId } = caller
   switch (name) {
+    case 'meetings.list': return { meetings: await listMeetings(repository, ownerId) }
+    case 'meetings.create': {
+      requireConfirmation(args)
+      return createMeeting(repository, ownerId, objectInput(args, 'meeting'))
+    }
+    case 'meetings.schedule': {
+      requireConfirmation(args)
+      const { id } = idInput.parse(args)
+      return scheduleGoogleMeeting(repository, ownerId, id, caller.requestId ?? randomUUID())
+    }
     case 'projects.list': return { projects: await listProjects(repository, ownerId, page(args)) }
     case 'projects.get': {
       const { id } = idInput.parse(args)

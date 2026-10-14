@@ -69,6 +69,7 @@ const meetingDataSchema = z.object({
   durationMinutes: z.number().int().positive().max(24 * 60).optional(),
   timezone: textSchema.max(100),
   link: z.string().url().optional(),
+  scheduleGoogle: z.boolean().optional(),
 }).strict().superRefine((data, context) => {
   if (!data.endsAt && data.durationMinutes === undefined) {
     context.addIssue({ code: z.ZodIssueCode.custom, path: ['endsAt'], message: 'Reunião exige fim ou duração.' })

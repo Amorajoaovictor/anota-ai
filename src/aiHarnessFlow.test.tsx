@@ -638,3 +638,14 @@ describe('front do harness supervisionado', () => {
     })
   })
 })
+
+describe('aprovação explícita de Calendar e Meet', () => {
+  it('mostra agendamento Google selecionado na proposta antes de executar', async () => {
+    const meeting = { id: 'meeting-online', topicIds: ['topic-1'], operation: 'CREATE' as const, entity: 'MEETING' as const, dependsOn: [], evidence: [{ topicId: 'topic-1', quote: 'Reunião online' }], confidence: { type: 95 }, duplicateCandidates: [], data: { title: 'Reunião online', startsAt: '2030-01-01T13:00:00Z', durationMinutes: 30, timezone: 'America/Sao_Paulo', scheduleGoogle: true } }
+    const view: HarnessView = { ...proposalView, proposalRevision: { ...proposalView.proposalRevision!, proposal: { ...proposalView.proposalRevision!.proposal, items: [meeting] } }, selectedItemIds: ['meeting-online'] }
+    const api = client(view)
+    render(<HarnessReviewPanel inboxItem={inbox} client={api} notify={vi.fn()} onBack={vi.fn()} />)
+    expect(await screen.findByRole('checkbox', { name: 'Agendar no Google Calendar e gerar Meet após aprovação' })).toBeChecked()
+    expect(api.execute).not.toHaveBeenCalled()
+  })
+})

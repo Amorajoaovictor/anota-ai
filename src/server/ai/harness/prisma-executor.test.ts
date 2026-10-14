@@ -170,3 +170,21 @@ describe('adapter Prisma do executor v2', () => {
     expect(result.entityIds).toContain('project-existente')
   })
 })
+
+describe('reunião online aprovada pelo agente', () => {
+  it('enfileira Google somente quando proposta pede agendamento, dentro da transação', async () => {
+    const fake = prismaFixture()
+    fake.tx.job = { create: vi.fn().mockResolvedValue({ id: 'google-job' }), findUnique: vi.fn() }
+    const repository = createPrismaHarnessExecutionRepository(fake.prisma)
+    const item = { ...proposal.items[3], data: { title: 'Online', startsAt: '2030-01-01T13:00:00Z', durationMinutes: 30, timezone: 'America/Sao_Paulo', scheduleGoogle: true } }
+    await repository.transaction((tx) => tx.createItem('owner-1', item as never, new Map(), new Map()))
+    expect(fake.tx.job.create).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ type: 'google.meeting.schedule', ownerId: 'owner-1', payload: expect.objectContaining({ ownerId: 'owner-1', meetingId: expect.any(String) }), dedupeKey: expect.stringContaining('google-meeting:') }) }))
+  })
+  it('preserva reunião local sem agendamento externo quando não solicitado', async () => {
+    const fake = prismaFixture()
+    fake.tx.job = { create: vi.fn() }
+    const item = { ...proposal.items[3], data: { title: 'Local', startsAt: '2030-01-01T13:00:00Z', durationMinutes: 30, timezone: 'UTC' } }
+    await createPrismaHarnessExecutionRepository(fake.prisma).transaction((tx) => tx.createItem('owner-1', item as never, new Map(), new Map()))
+    expect(fake.tx.job.create).not.toHaveBeenCalled()
+  })
+})

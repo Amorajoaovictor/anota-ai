@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { scheduleGoogleMeeting } from '../google-meetings'
 import { getAiProviders, readAiEnvironment } from '../ai/config'
 import { recordAuditEvent } from '../audit-log'
 import { getPrisma } from '../../lib/prisma'
@@ -25,6 +26,7 @@ export const JOB_TYPES = [
   'ai.cleanup-audio',
   'ai.sweep-audio',
   'reminder.dispatch',
+  'google.meeting.schedule',
 ] as const
 
 export type JobType = (typeof JOB_TYPES)[number]
@@ -78,6 +80,14 @@ export const jobHandlers: Record<JobType, JobHandler> = {
   'ai.cleanup-audio': (job) => cleanupHarnessAudio(getStorage(), job.payload),
   'ai.sweep-audio': async () => { await sweepOrphanAudio(getPrisma() as any, getStorage()) },
   'reminder.dispatch': (job) => recordJobRun(job),
+  'google.meeting.schedule': async (job) => {
+    const payload = z.object({ ownerId: z.string().min(1), meetingId: z.string().min(1) }).strict().parse(job.payload)
+    if (payload.ownerId !== job.ownerId) throw new Error(`Google scheduling owner mismatch for job ${job.id}`)
+    const result = await scheduleGoogleMeeting(getPrisma(), job.ownerId, payload.meetingId, job.id)
+    if (result.kind !== 'scheduled') throw new Error(`Google scheduling ${result.kind} for job ${job.id}; meetingId=${payload.meetingId}`)
+    if (result.conferenceStatus === 'pending') throw new Error(`Google Meet pending for job ${job.id}; meetingId=${payload.meetingId}`)
+    await recordAuditEvent({ actorId: job.ownerId, action: 'meeting.google.scheduled', entityType: 'Meeting', entityId: payload.meetingId, metadata: { jobId: job.id } })
+  },
 }
 
 export function isJobType(type: string): type is JobType {

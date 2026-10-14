@@ -60,3 +60,17 @@ Escopos: `read`, `create`, `update` e `context`. Toda escrita exige `confirmed: 
 A confirmação ocorre na conversa com o agente. O servidor não tem acesso a essa conversa e não consegue verificar de forma independente se a resposta veio do usuário. Conceda escopos de escrita somente a clientes MCP em que confia.
 
 Operações de inbox seguem o classificador legado ao chamar `inbox.create`. `inbox.harness` permite ler o estado de uma revisão existente; sua aprovação e execução continuam disponíveis no app. Cards podem ser criados diretamente por `tasks.create`, sem passar pelo classificador.
+
+## Google Calendar e Meet
+Conecte sua conta em **Integrações > Google Calendar e Meet** antes de usar.
+- `meetings.list`: lista reuniões pertencentes ao dono do token.
+- `meetings.create`: cria reunião local. Informe título, `startsAt`, `endsAt` ou `durationMinutes`, e `timezone` IANA. Exige `confirmed:true`.
+- `meetings.schedule`: recebe o `id` local e `confirmed:true`; cria evento no calendário principal e gera Meet. Repetir o mesmo ID recupera evento existente. Se `conferenceStatus` for `pending`, repetir para consultar o link.
+Confirme horários e fuso com o usuário. Não infira duração. Essas ferramentas não enviam convites a terceiros.
+Configuração servidor: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_TOKEN_ENCRYPTION_KEY` (32 bytes em base64). Ative Calendar API; OAuth web deve cadastrar exatamente a URI de callback. Escopo: `calendar.events.owned`; não pede acesso a Gmail/Drive. Refresh token é criptografado no banco. Cada dono conecta sua própria conta.
+Reuniões existentes não são sincronizadas automaticamente. A ação explícita de agendamento publica título, descrição e horários daquela reunião no Calendar. Edição/remoção local não altera evento Google nesta versão. Antes de repetir criação local, confira resultado e `meetings.list`; repetir agendamento do mesmo ID não duplica evento Google.
+
+### Agente interno (Revisão IA)
+Propostas MEETING aceitam `scheduleGoogle:true`. Materializador usa a opção apenas quando Markdown aprovado pedir Calendar/Meet. Escolha fica visível e editável antes de aprovar itens. Após aprovação, reunião e job de agendamento são gravados na mesma transação. Worker drena `google.meeting.schedule`, renova token e preenche link Meet. Falhas e geração pendente usam retries da fila; ID do evento permanece estável. Não há chamada externa dentro da transação. Google deve estar conectado antes de aprovar agendamento online.
+
+OAuth usa página de retorno da própria origem e POST autenticado para preservar cookies SameSite=Strict do Neon Auth. Código de autorização é removido da URL antes da conclusão; estado é consumido uma vez, ligado ao dono e com validade de 10 minutos.

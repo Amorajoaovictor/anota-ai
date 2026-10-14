@@ -5,6 +5,7 @@ import { useMemo, useState, type FormEvent } from 'react'
 import { scopeMeetings, scopeProject, scopeProjects, type AppState, type Meeting, type Scope } from './domain'
 import type { ProjectActions } from './lib/store'
 import { Heading } from './heading'
+import { GoogleMeetingButton } from './googleIntegration'
 import { Button, ConfirmDialog, EmptyState, Modal } from './ui'
 
 type MeetingDraft = { projectId: string; title: string; description: string; startsAt: string; endsAt: string; link: string }
@@ -32,6 +33,7 @@ export function MeetingsView({ state, scope, actions }: { state: AppState; scope
           <h2>{meeting.title}</h2>
           {meeting.description && <p>{meeting.description}</p>}
           <span><Clock size={14} />{formatMeetingTime(meeting.startsAt, meeting.endsAt)}</span>
+          {!meeting.link && <GoogleMeetingButton meetingId={meeting.id} />}
           {meeting.link && <a href={meeting.link} target="_blank" rel="noreferrer">Abrir link</a>}
         </div>
         <div className="meeting-actions"><button aria-label={`Editar ${meeting.title}`} onClick={() => setEditing(meeting)}><PencilSimple size={17} /></button><button aria-label={`Remover ${meeting.title}`} onClick={() => setRemoving(meeting)}><Trash size={17} /></button></div>

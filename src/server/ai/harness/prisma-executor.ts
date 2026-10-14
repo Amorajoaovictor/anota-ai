@@ -309,6 +309,9 @@ async function createPrismaProposalItem(
       ownerId, projectId: project?.id ?? null, title: item.data.title, description: item.data.description ?? '',
       startsAt, endsAt, durationMinutes: item.data.durationMinutes ?? null, timezone: item.data.timezone, link: item.data.link ?? null,
     } })
+    if (item.data.scheduleGoogle) {
+      await enqueue(transaction, { type: 'google.meeting.schedule', ownerId, payload: { ownerId, meetingId: meeting.id }, dedupeKey: `google-meeting:${meeting.id}`, timeoutMs: 60_000 })
+    }
     return materialized(item, meeting.id, project?.id)
   }
   if (!project) throw new Error(`${item.entity} exige projeto.`)

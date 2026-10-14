@@ -1054,6 +1054,7 @@ function ProposalEntityFields({ item, projects, onChange }: {
         <label>Fim<input type="datetime-local" value={dateTimeInput(item.data.endsAt)} onChange={(event) => patch({ endsAt: dateTimeOutput(event.target.value) ?? undefined })} /></label>
         <label>Duração em minutos<input type="number" min="1" max="1440" value={item.data.durationMinutes ?? ''} onChange={(event) => patch({ durationMinutes: event.target.value ? Number(event.target.value) : undefined })} /></label>
         <label>Fuso<input value={item.data.timezone} onChange={(event) => patch({ timezone: event.target.value })} /></label>
+        <label className="proposal-wide"><input type="checkbox" checked={item.data.scheduleGoogle ?? false} onChange={(event) => patch({ scheduleGoogle: event.target.checked })} />Agendar no Google Calendar e gerar Meet após aprovação</label>
         <label>Link<input type="url" value={item.data.link ?? ''} onChange={(event) => patch({ link: event.target.value || undefined })} /></label>
         <label className="proposal-wide">Descrição<textarea value={item.data.description ?? ''} onChange={(event) => patch({ description: event.target.value })} /></label>
       </div>
