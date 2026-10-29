@@ -97,3 +97,17 @@ final result: passed
 - Captura conferida inline. Sem teste em aparelho físico e sem alteração de datas reais na verificação de produção.
 
 final result: passed
+
+# Design QA — Kanban compacto (07/10/2026)
+
+- Referência: primeira imagem selecionada, exec-dccb933e-f9b7-4053-a4ca-59d11d0718eb.png, com arraste dos cards para os status no topo do celular.
+- Implementação: src/kanban.tsx, src/kanban.css e mecanismo compartilhado src/touchDrag.tsx.
+- Conferência no navegador local usando App real, dados fictícios e API de escrita simulada; nenhuma tarefa real alterada.
+- Desktop: 1440 x 1024 CSS px, seis colunas na mesma faixa, sem vazamento lateral. Arraste entre colunas conferido no navegador.
+- Celular: 390 x 844 CSS px, uma coluna selecionada, status superiores com rolagem horizontal e navegação inferior existente. Sem vazamento lateral da página.
+- Corrigidos filtro de marco quebrado no celular e datas quebradas nos cards desktop.
+- Gesto compartilhado: segurar card por 350 ms inicia arraste; rolagem comum e toque continuam disponíveis; cancelar não salva; destinos superiores destacam o status e aceitam uma única movimentação.
+- 27 testes Kanban/Roadmap aprovados: todos os destinos, reordenação desktop, cancelamento, bloqueio de rolagem somente durante arraste e falha de salvamento mantendo coluna de origem.
+- Toque validado em testes automatizados; celular físico não foi usado nesta revisão. Persistência usa a ação existente do app, sem nova API.
+
+final result: passed

@@ -1,0 +1,93 @@
+.mcp-integration {
+  grid-column: 1 / -1;
+  min-width: 0;
+  gap: 16px;
+}
+
+.mcp-form, .mcp-name-field, .mcp-issued {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.mcp-name-field { gap: 8px; }
+.mcp-name-field label, .mcp-permissions legend { font-size: 13px; font-weight: 600; }
+.mcp-name-field input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  max-width: 420px;
+  min-height: 44px;
+  padding: 10px 12px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface-sunken);
+  color: var(--text);
+  font: inherit;
+}
+.mcp-name-field input:focus-visible { border-color: var(--green); }
+
+.mcp-permissions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 20px;
+  min-width: 0;
+  margin: 0;
+  padding: 12px 0 0;
+  border: 0;
+}
+.mcp-permissions legend { padding: 0; }
+.mcp-permission {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+  min-height: 44px;
+  cursor: pointer;
+}
+.mcp-permission input {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  accent-color: var(--green);
+}
+.mcp-integration .mcp-permission span { color: var(--text); font-size: 13px; }
+.mcp-form > .primary-button { justify-self: start; }
+
+.mcp-issued {
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.mcp-integration .mcp-issued strong { font-size: 14px; line-height: 1.5; }
+.mcp-token-value {
+  display: block;
+  min-width: 0;
+  padding: 12px;
+  border-radius: var(--r-sm);
+  background: var(--surface-sunken);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+  user-select: all;
+}
+.mcp-issued span { overflow-wrap: anywhere; }
+.mcp-connection {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.mcp-connection > span { overflow-wrap: anywhere; }
+.mcp-connection button { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+
+@media (max-width: 760px) {
+  .mcp-permissions { grid-template-columns: 1fr; }
+  .mcp-name-field input { max-width: none; }
+  .mcp-connection { align-items: flex-start; flex-direction: column; }
+}

@@ -1,0 +1,11 @@
+{
+  "requestId": "c264de1d-1fc7-4042-b912-7e6850a2e526",
+  "kind": "scheduled",
+  "conferenceStatus": "success",
+  "meetingId": "cmv8etuf20003kx081lzskpdy",
+  "title": "Teste integração Anota Aí",
+  "startsAt": "2026-10-15T12:00:00.000Z",
+  "endsAt": "2026-10-15T12:15:00.000Z",
+  "link": "https://meet.google.com/ocu-uakd-gia",
+  "googleEventId": "31c5b0d3cd8efa5bcc9910465dded5afa751c4a74e982f01baf4022f479db73d"
+}

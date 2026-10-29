@@ -6,22 +6,15 @@ import { dragHandleProps, reorderKeyProps, useDropZone, type DragItem } from './
 import { globalScope, projectScope, reorderActionPlan, sortActionPlanByPriority, type AppState, type Scope, type SearchHit, type Task } from './domain'
 import type { CurrentUser } from './lib/auth/server'
 import { useProjectData, type ProjectActions } from './lib/store'
-import { Phase1View, projectSections, type Phase1Section, type ProjectSection } from './phase1'
+import { Phase1View, projectSections, type ProjectSection } from './phase1'
 import { TaskCreateDialog, type TaskCreateDefaults, type TaskCreateInput } from './taskCreate'
 import { TodayCapture } from './todayCapture'
 import { NotificationBell } from './notificationBell'
 import { SignOutButton } from './app/SignOutButton'
 import { Button, CommandPalette, EmptyState, Toast, useToast, type CommandAction, type Notify, type PaletteResult } from './ui'
 
-type Section = 'Hoje' | Phase1Section
-
-/**
- * Uma rota global e uma rota de projeto. As duas alimentam as mesmas telas —
- * só o escopo muda. Ver `arquitetura-navegacao.md`.
- */
-type Route =
-  | { kind: 'global'; section: Section }
-  | { kind: 'project'; projectId: string; section: ProjectSection }
+import { routeFromPath, routeToPath, type Route, type Section } from './navigation'
+import { NavigationLink } from './navigationLink'
 
 type NavItem = { label: Section; icon: typeof House }
 
@@ -50,8 +43,8 @@ function userInitials(user: CurrentUser): string {
   return source.slice(0, 2).toUpperCase()
 }
 
-export default function App({ initialState, user }: { initialState: AppState; user: CurrentUser }) {
-  const [route, setRoute] = useState<Route>({ kind: 'global', section: 'Hoje' })
+export default function App({ initialState, user, initialRoute = { kind: 'global', section: 'Hoje' } }: { initialState: AppState; user: CurrentUser; initialRoute?: Route }) {
+  const [route, setRoute] = useState<Route>(initialRoute)
   const { toast, notify, dismiss } = useToast()
   const { state, setState, actions } = useProjectData(initialState, notify)
   const [createDraft, setCreateDraft] = useState<TaskCreateDefaults | null>(null)
@@ -62,6 +55,27 @@ export default function App({ initialState, user }: { initialState: AppState; us
   const pendingReviewCount = useMemo(() => state.inbox.filter((item) => item.status === 'Aguardando confirmação').length, [state.inbox])
   const scope: Scope = route.kind === 'project' ? projectScope(route.projectId) : globalScope
   const openProject = state.projects.find((project) => route.kind === 'project' && project.id === route.projectId)
+
+  useEffect(() => {
+    function restoreRoute() {
+      const restored = routeFromPath(window.location.pathname)
+      if (restored) {
+        setRoute(restored)
+        setMobileMoreOpen(false)
+        setOpenTaskId(null)
+      }
+    }
+    window.addEventListener('popstate', restoreRoute)
+    return () => window.removeEventListener('popstate', restoreRoute)
+  }, [])
+
+  function navigate(next: Route) {
+    const path = routeToPath(next)
+    if (window.location.pathname !== path) window.history.pushState(null, '', path)
+    setRoute(next)
+    setMobileMoreOpen(false)
+    setOpenTaskId(null)
+  }
 
   // Atalho global: criar card sem depender da tela aberta. Ver `prd.md` seção 12.10.
   useEffect(() => {
@@ -94,13 +108,11 @@ export default function App({ initialState, user }: { initialState: AppState; us
   }
 
   function goGlobal(section: Section) {
-    setMobileMoreOpen(false)
-    setRoute({ kind: 'global', section })
+    navigate({ kind: 'global', section })
   }
 
   function goProject(projectId: string, section: ProjectSection = 'Visão geral') {
-    setMobileMoreOpen(false)
-    setRoute({ kind: 'project', projectId, section })
+    navigate({ kind: 'project', projectId, section })
   }
 
   const paletteActions: CommandAction[] = [
@@ -130,28 +142,29 @@ export default function App({ initialState, user }: { initialState: AppState; us
         {group && <p className="nav-group-label">{group}</p>}
         {items.map(({ label, icon: Icon }) => {
           const active = route.kind === 'global' && route.section === label
-          return <button key={label} aria-label={label} aria-current={active ? 'page' : undefined} className={`nav-item ${active ? 'active' : ''}`} onClick={() => goGlobal(label)}>
+          return <NavigationLink href={routeToPath({ kind: 'global', section: label })} key={label} aria-label={label} aria-current={active ? 'page' : undefined} className={`nav-item ${active ? 'active' : ''}`} onNavigate={() => goGlobal(label)}>
             <Icon size={20} weight={active ? 'fill' : 'regular'} /><span>{label}</span>
-          </button>
+          </NavigationLink>
         })}
       </div>)}</nav>
       <div className="recent">
         <p>PROJETOS RECENTES</p>
-        {state.projects.filter((project) => !project.archived).map((project) => <button
+        {state.projects.filter((project) => !project.archived).map((project) => <NavigationLink
+          href={routeToPath({ kind: 'project', projectId: project.id, section: 'Visão geral' })}
           key={project.id}
           className={`recent-project ${route.kind === 'project' && route.projectId === project.id ? 'active' : ''}`}
-          onClick={() => goProject(project.id)}
+          onNavigate={() => goProject(project.id)}
         >
           <i style={{ background: project.color }} />{project.name}<small>{project.priority} · {project.progress}%</small>
-        </button>)}
+        </NavigationLink>)}
       </div>
       <div className="profile"><div className="avatar">{userInitials(user)}</div><div><strong>{user.name || user.email || 'Sem nome'}</strong>{user.name && user.email && <small>{user.email}</small>}</div></div>
     </aside>
 
     <main className="main-content">
       <header className="topbar">
-        <div className="mobile-brand"><ProjectorScreenChart size={22} weight="duotone" /> Central de Projetos</div>
-        <button className="search" onClick={() => setPaletteOpen(true)}><MagnifyingGlass size={18} /><span>Buscar tarefas, projetos...</span><kbd>⌘ K</kbd></button>
+        <div className="mobile-brand"><ProjectorScreenChart size={22} weight="duotone" /><span>Central de Projetos</span></div>
+        <button className="search" aria-label="Buscar tarefas e projetos" title="Buscar tarefas e projetos" onClick={() => setPaletteOpen(true)}><MagnifyingGlass size={18} /><span>Buscar tarefas, projetos...</span><kbd>⌘ K</kbd></button>
         <div className="top-actions">
           <button className="topbar-create" onClick={() => openTaskCreate()} title="Nova tarefa (N)"><Plus size={18} weight="bold" /><span>Nova tarefa</span></button>
           <NotificationBell tasks={state.tasks} meetings={state.meetings} pendingReviewCount={pendingReviewCount}
@@ -163,27 +176,28 @@ export default function App({ initialState, user }: { initialState: AppState; us
       </header>
 
       {route.kind === 'project' && openProject && <nav className="project-tabs" aria-label={`Seções de ${openProject.name}`}>
-        <button className="project-tabs-back" onClick={() => goGlobal('Projetos')}><ArrowLeft size={16} />Projetos</button>
+        <NavigationLink href="/projetos" className="project-tabs-back" onNavigate={() => goGlobal('Projetos')}><ArrowLeft size={16} />Projetos</NavigationLink>
         <span className="project-tabs-name"><i style={{ background: openProject.color }} />{openProject.name}</span>
-        {projectSections.map((item) => <button
+        {projectSections.map((item) => <NavigationLink
+          href={routeToPath({ kind: 'project', projectId: openProject.id, section: item })}
           key={item}
           aria-current={route.section === item ? 'page' : undefined}
           className={`project-tab ${route.section === item ? 'active' : ''}`}
-          onClick={() => goProject(openProject.id, item)}
-        >{item}</button>)}
+          onNavigate={() => goProject(openProject.id, item)}
+        >{item}</NavigationLink>)}
       </nav>}
 
       {renderMain()}
     </main>
 
     <nav className="mobile-bottom-nav" aria-label="Navegação principal">
-      <button aria-current={route.kind === 'global' && route.section === 'Hoje' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Hoje' ? 'active' : ''} onClick={() => goGlobal('Hoje')}><House size={21} /><span>Hoje</span></button>
-      <button aria-current={route.kind === 'global' && route.section === 'Projetos' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Projetos' ? 'active' : ''} onClick={() => goGlobal('Projetos')}><Archive size={21} /><span>Projetos</span></button>
-      <button aria-current={route.kind === 'global' && route.section === 'Kanban' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Kanban' ? 'active' : ''} onClick={() => goGlobal('Kanban')}><KanbanIcon size={21} /><span>Tarefas</span></button>
+      <NavigationLink href="/hoje" aria-current={route.kind === 'global' && route.section === 'Hoje' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Hoje' ? 'active' : ''} onNavigate={() => goGlobal('Hoje')}><House size={21} /><span>Hoje</span></NavigationLink>
+      <NavigationLink href="/projetos" aria-current={route.kind === 'global' && route.section === 'Projetos' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Projetos' ? 'active' : ''} onNavigate={() => goGlobal('Projetos')}><Archive size={21} /><span>Projetos</span></NavigationLink>
+      <NavigationLink href="/kanban" aria-current={route.kind === 'global' && route.section === 'Kanban' ? 'page' : undefined} className={route.kind === 'global' && route.section === 'Kanban' ? 'active' : ''} onNavigate={() => goGlobal('Kanban')}><KanbanIcon size={21} /><span>Tarefas</span></NavigationLink>
       <button aria-expanded={mobileMoreOpen} className={mobileMoreOpen || (route.kind === 'project' || !['Hoje', 'Projetos', 'Kanban'].includes(route.section)) ? 'active' : ''} onClick={() => setMobileMoreOpen((open) => !open)}><DotsThree size={22} /><span>Mais</span></button>
     </nav>
     {mobileMoreOpen && <nav id="mobile-more-menu" className="mobile-more-menu" aria-label="Mais seções">
-      {nav.filter((item) => !['Hoje', 'Projetos', 'Kanban', 'Caixa de entrada'].includes(item.label)).map(({ label, icon: Icon }) => <button key={label} onClick={() => goGlobal(label)}><Icon size={19} /><span>{label}</span></button>)}
+      {nav.filter((item) => !['Hoje', 'Projetos', 'Kanban', 'Caixa de entrada'].includes(item.label)).map(({ label, icon: Icon }) => <NavigationLink href={routeToPath({ kind: 'global', section: label })} key={label} onNavigate={() => goGlobal(label)}><Icon size={19} /><span>{label}</span></NavigationLink>)}
     </nav>}
 
     {createDraft && <TaskCreateDialog
@@ -273,7 +287,7 @@ function Today({ state, setState, actions, activeTasks, notify, onCreateTask, on
 
     <div className="mobile-today">
       <header className="mobile-today-heading"><p>PLANEJAMENTO</p><h1>Hoje</h1></header>
-      <TodayCapture projects={state.projects} onCaptureTask={actions.captureInbox} onSaveNote={(input) => actions.createNote({ title: '', ...input })} />
+      <TodayCapture projects={state.projects} onCaptureTask={actions.captureInbox} onCaptureAudio={actions.captureInboxAudio} onSaveNote={(input) => actions.createNote({ title: '', ...input })} />
 
       <section className="mobile-today-section" aria-labelledby="mobile-next-action-title">
         <div className="mobile-today-section-heading"><h2 id="mobile-next-action-title">Próxima ação</h2><span>{activeTasks.length} em aberto</span></div>

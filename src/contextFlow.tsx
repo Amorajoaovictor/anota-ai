@@ -58,7 +58,7 @@ function useInboxPolling(state: AppState, actions: ProjectActions) {
 }
 
 /** Grava com `MediaRecorder` nativo do browser — sem dependência nova. */
-function useAudioRecorder(onStop: (blob: Blob) => void) {
+export function useAudioRecorder(onStop: (blob: Blob) => void) {
   const [recording, setRecording] = useState(false)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<Blob[]>([])

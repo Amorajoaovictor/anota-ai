@@ -1,0 +1,66 @@
+{"kind":"deck","id":"pr/wcxfzj","name":"Deck"}
+{"kind":"layout","layoutId":"a8da09d8-212c-4894-ba92-2f22d1eba606","name":"Master","type":"master"}
+{"kind":"layout","layoutId":"fd873ec0-b90a-4526-85f3-e7406df172ae","name":"Title Slide","type":"title"}
+{"kind":"slide","id":"sl/4qot8h","slide":1,"title":"Anota Aí","textShapes":2}
+{"kind":"textbox","id":"sh/kjy5obi9","slide":1,"name":"Texto editável","text":"Anota Aí","textPreview":"Anota Aí","textChars":8,"textLines":1,"bbox":[120,345,1450,290]}
+{"kind":"textbox","id":"sh/bu54rmhs","slide":1,"name":"Texto editável","text":"Suas ideias,\nno projeto certo","textPreview":"Suas ideias, | no projeto certo","textChars":29,"textLines":2,"bbox":[130,710,1300,225]}
+{"kind":"image","id":"im/butgvupk","slide":1,"name":"","alt":"Fundo da identidade Anota Aí","bbox":[0,0,1920,1080]}
+{"kind":"image","id":"im/cv2h4zq5","slide":1,"name":"","alt":"Ícone original da aplicação","bbox":[125,100,140,140]}
+{"kind":"notes","id":"nt/4qot8h","slide":1,"text":"Quando você cuida de vários projetos, uma demanda chega em áudio, outra em mensagem, outra na reunião. O Anota Aí nasce para organizar essas entradas no projeto certo.\nFonte: PRODUCT.md e prd.md. Logo original: public/icon.svg."}
+{"kind":"slide","id":"sl/v82kkx","slide":2,"title":"Sobrecarga","textShapes":1}
+{"kind":"textbox","id":"sh/3ipc72tw","slide":2,"name":"Texto editável","text":"Sobrecarga","textPreview":"Sobrecarga","textChars":10,"textLines":1,"bbox":[120,390,820,285]}
+{"kind":"image","id":"im/h8ri9sjq","slide":2,"name":"","alt":"Sobrecarga — ilustração conceitual","bbox":[990,85,1010,1010]}
+{"kind":"notes","id":"nt/v82kkx","slide":2,"text":"O problema começa quando acompanhar o trabalho depende da nossa memória. Trocar de ferramenta e reorganizar demandas consome a atenção que deveria estar na execução.\nFonte: prd.md, seção 3.\nImagem: ilustração conceitual gerada com IA, não captura da aplicação."}
+{"kind":"slide","id":"sl/2vz6zi","slide":3,"title":"Espalhado","textShapes":1}
+{"kind":"textbox","id":"sh/yxgjqxwf","slide":3,"name":"Texto editável","text":"Espalhado","textPreview":"Espalhado","textChars":9,"textLines":1,"bbox":[1060,390,820,285]}
+{"kind":"image","id":"im/8nil03md","slide":3,"name":"","alt":"Espalhado — ilustração conceitual","bbox":[0,85,1010,1010]}
+{"kind":"notes","id":"nt/2vz6zi","slide":3,"text":"As demandas ficam distribuídas entre mensagens, áudios, anotações e quadros. O desafio é preservar o contexto de cada projeto quando uma informação nova chega.\nFonte: PRODUCT.md, contexto operacional.\nImagem: ilustração conceitual gerada com IA, não captura da aplicação."}
+{"kind":"slide","id":"sl/t38jl2","slide":4,"title":"Você fala.","textShapes":1}
+{"kind":"textbox","id":"sh/6d8felgb","slide":4,"name":"Texto editável","text":"Você fala.\nVira tarefa.","textPreview":"Você fala. | Vira tarefa.","textChars":23,"textLines":2,"bbox":[120,390,820,285]}
+{"kind":"image","id":"im/4ryxkne9","slide":4,"name":"","alt":"Você fala.\nVira tarefa. — ilustração conceitual","bbox":[990,85,1010,1010]}
+{"kind":"notes","id":"nt/t38jl2","slide":4,"text":"A entrada pode ser áudio ou texto. A IA sugere uma tarefa estruturada e identifica o projeto relacionado. O usuário revisa, corrige e confirma antes de gravar.\nFonte: prd.md 2.2 e src/server/inbox.ts.\nImagem: ilustração conceitual gerada com IA, não captura da aplicação."}
+{"kind":"slide","id":"sl/gowywa","slide":5,"title":"Foco","textShapes":1}
+{"kind":"textbox","id":"sh/fyh0jats","slide":5,"name":"Texto editável","text":"Foco","textPreview":"Foco","textChars":4,"textLines":1,"bbox":[1060,390,820,285]}
+{"kind":"image","id":"im/h47u54zy","slide":5,"name":"","alt":"Foco — ilustração conceitual","bbox":[0,85,1010,1010]}
+{"kind":"notes","id":"nt/gowywa","slide":5,"text":"O benefício é reunir as demandas e ter clareza sobre o próximo trabalho. Kanban, roadmap e plano do dia oferecem perspectivas sobre os mesmos dados. Não há promessa de ganho percentual de produtividade.\nFonte: prd.md, resumo executivo e PRODUCT.md.\nImagem: ilustração conceitual gerada com IA, não captura da aplicação."}
+{"kind":"slide","id":"sl/sdkjtf","slide":6,"title":"Contexto","textShapes":2}
+{"kind":"textbox","id":"sh/h4zy1w3u","slide":6,"name":"Texto editável","text":"Contexto","textPreview":"Contexto","textChars":8,"textLines":1,"bbox":[120,285,820,290]}
+{"kind":"textbox","id":"sh/g36x8r29","slide":6,"name":"Texto editável","text":"A IA consulta o projeto.\nVocê confirma.","textPreview":"A IA consulta o projeto. | Você confirma.","textChars":39,"textLines":2,"bbox":[120,635,810,235]}
+{"kind":"image","id":"im/7ytsb690","slide":6,"name":"","alt":"Contexto — ilustração conceitual","bbox":[990,85,1010,1010]}
+{"kind":"notes","id":"nt/sdkjtf","slide":6,"text":"O diferencial é consultar o contexto de cada projeto, incluindo vocabulário, aliases e decisões. A sugestão permanece sob revisão humana antes da gravação.\nFonte: PRODUCT.md, posicionamento e princípios.\nImagem: ilustração conceitual gerada com IA, não captura da aplicação."}
+{"kind":"slide","id":"sl/78lipa","slide":7,"title":"Tecnologia","textShapes":2}
+{"kind":"textbox","id":"sh/4rydwv2p","slide":7,"name":"Texto editável","text":"Tecnologia","textPreview":"Tecnologia","textChars":10,"textLines":1,"bbox":[1060,285,820,290]}
+{"kind":"textbox","id":"sh/5s7u503a","slide":7,"name":"Texto editável","text":"Next.js\nPostgreSQL\nIA","textPreview":"Next.js | PostgreSQL | IA","textChars":21,"textLines":3,"bbox":[1060,635,810,235]}
+{"kind":"image","id":"im/6d03m1s7","slide":7,"name":"","alt":"Tecnologia — ilustração conceitual","bbox":[0,85,1010,1010]}
+{"kind":"notes","id":"nt/78lipa","slide":7,"text":"A base utiliza Next.js e PostgreSQL, com Prisma para acesso aos dados. Transcrição e IA usam uma fila de processamento. Essa separação ajuda a manter a criação manual disponível quando um serviço externo falha.\nFonte: package.json, PRODUCT.md e src/server/inbox.ts.\nImagem: ilustração conceitual gerada com IA, não captura da aplicação."}
+{"kind":"slide","id":"sl/na6rx6","slide":8,"title":"Beta","textShapes":3}
+{"kind":"textbox","id":"sh/ozmd8val","slide":8,"name":"Texto editável","text":"Beta","textPreview":"Beta","textChars":4,"textLines":1,"bbox":[120,285,820,290]}
+{"kind":"textbox","id":"sh/p0ve10b6","slide":8,"name":"Texto editável","text":"Funções principais\nem operação","textPreview":"Funções principais | em operação","textChars":30,"textLines":2,"bbox":[120,635,810,235]}
+{"kind":"textbox","id":"sh/e9kv2lsj","slide":8,"name":"Texto editável","text":"Ilustração","textPreview":"Ilustração","textChars":10,"textLines":1,"bbox":[1215,995,550,45]}
+{"kind":"image","id":"im/ehcji947","slide":8,"name":"","alt":"Beta — ilustração conceitual","bbox":[990,85,1010,1010]}
+{"kind":"notes","id":"nt/na6rx6","slide":8,"text":"O aplicativo entrou em beta. Todas as funções principais estão rodando, conforme informação atual dos responsáveis. A imagem é uma ilustração conceitual, não a interface real.\nFonte: atualização fornecida pelo usuário nesta conversa.\nImagem: ilustração conceitual gerada com IA, não captura da aplicação."}
+{"kind":"slide","id":"sl/lffj0t","slide":9,"title":"≈ US$ 2","textShapes":3}
+{"kind":"textbox","id":"sh/nidcjut4","slide":9,"name":"Texto editável","text":"≈ US$ 2","textPreview":"≈ US$ 2","textChars":7,"textLines":1,"bbox":[120,210,1640,350]}
+{"kind":"textbox","id":"sh/mh4bapcj","slide":9,"name":"Texto editável","text":"IA por mês","textPreview":"IA por mês","textChars":10,"textLines":1,"bbox":[130,645,1530,125]}
+{"kind":"textbox","id":"sh/lgvuhkby","slide":9,"name":"Texto editável","text":"Hospedagem opcional","textPreview":"Hospedagem opcional","textChars":19,"textLines":1,"bbox":[130,830,1530,85]}
+{"kind":"image","id":"im/9crihoj2","slide":9,"name":"","alt":"Fundo da identidade Anota Aí","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/lffj0t","slide":9,"text":"Segundo os responsáveis, o custo atual do aplicativo é aproximadamente ≈ US$ 2 por mês, referente ao uso de IA. Hospedagem é opcional. O valor descreve o uso atual e não projeta custo em escala.\nFonte: informação fornecida pelo usuário nesta conversa."}
+{"kind":"slide","id":"sl/996j7u","slide":10,"title":"Código","textShapes":2}
+{"kind":"textbox","id":"sh/36xgbe90","slide":10,"name":"Texto editável","text":"Código\naberto","textPreview":"Código | aberto","textChars":13,"textLines":2,"bbox":[120,220,1450,500]}
+{"kind":"textbox","id":"sh/25oz29sf","slide":10,"name":"Texto editável","text":"Proposta sem lucro nesta fase","textPreview":"Proposta sem lucro nesta fase","textChars":29,"textLines":1,"bbox":[130,815,1620,125]}
+{"kind":"image","id":"im/twby5wbm","slide":10,"name":"","alt":"Fundo da identidade Anota Aí","bbox":[0,0,1920,1080]}
+{"kind":"notes","id":"nt/996j7u","slide":10,"text":"O projeto está sendo pensado para ser open source, sem pretensão de lucro neste primeiro momento. Não há plano comercial, preço de assinatura ou licença definidos nesta apresentação.\nFonte: informação fornecida pelo usuário nesta conversa."}
+{"kind":"slide","id":"sl/zmgqqp","slide":11,"title":"Equipe","textShapes":5}
+{"kind":"textbox","id":"sh/1kvup4ze","slide":11,"name":"Texto editável","text":"Equipe","textPreview":"Equipe","textChars":6,"textLines":1,"bbox":[120,85,1600,160]}
+{"kind":"textbox","id":"sh/nmdcruhk","slide":11,"name":"Texto editável","text":"João Victor\nAmora","textPreview":"João Victor | Amora","textChars":17,"textLines":2,"bbox":[145,385,755,230]}
+{"kind":"textbox","id":"sh/2l4vip0z","slide":11,"name":"Texto editável","text":"Dev","textPreview":"Dev","textChars":3,"textLines":1,"bbox":[145,710,755,90]}
+{"kind":"textbox","id":"sh/pofut4za","slide":11,"name":"Texto editável","text":"Fabrício Lessa\nBraga","textPreview":"Fabrício Lessa | Braga","textChars":20,"textLines":2,"bbox":[1040,385,755,230]}
+{"kind":"textbox","id":"sh/onmdkzi5","slide":11,"name":"Texto editável","text":"Gestão, PO,\nScrum Master","textPreview":"Gestão, PO, | Scrum Master","textChars":24,"textLines":2,"bbox":[1040,710,755,190]}
+{"kind":"image","id":"im/nit8nmtw","slide":11,"name":"","alt":"Fundo da identidade Anota Aí","bbox":[0,0,1920,1080]}
+{"kind":"image","id":"im/9kvqpwb2","slide":11,"name":"","alt":"Ícone original da aplicação","bbox":[1710,95,105,105]}
+{"kind":"notes","id":"nt/zmgqqp","slide":11,"text":"João Victor Amora atua como desenvolvedor. Fabrício Lessa Braga atua na gestão, como Product Owner e Scrum Master.\nFonte: nomes e funções fornecidos pelo usuário nesta conversa."}
+{"kind":"slide","id":"sl/gyex7v","slide":12,"title":"Anota Aí","textShapes":2}
+{"kind":"textbox","id":"sh/h8ny18za","slide":12,"name":"Texto editável","text":"Anota Aí","textPreview":"Anota Aí","textChars":8,"textLines":1,"bbox":[120,285,820,290]}
+{"kind":"textbox","id":"sh/w7ehs3ip","slide":12,"name":"Texto editável","text":"O próximo passo\nno projeto certo","textPreview":"O próximo passo | no projeto certo","textChars":32,"textLines":2,"bbox":[120,635,810,235]}
+{"kind":"image","id":"im/rah8zmh4","slide":12,"name":"","alt":"Anota Aí — ilustração conceitual","bbox":[990,85,1010,1010]}
+{"kind":"notes","id":"nt/gyex7v","slide":12,"text":"O Anota Aí quer transformar o que chega no dia a dia em trabalho organizado, com contexto e revisão humana. O próximo passo é apresentar o fluxo do beta.\nFonte: PRODUCT.md e prd.md.\nImagem: ilustração conceitual gerada com IA, não captura da aplicação."}
